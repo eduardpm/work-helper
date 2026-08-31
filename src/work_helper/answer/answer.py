@@ -4,27 +4,20 @@ from ..config import Config
 from ..indexer.llm import LLM
 from .search import top_files
 
-TERMS_PROMPT = """You build a search plan for a grep over the user's work
-notes. The user rarely uses the same words as the notes, so do not just copy
-words out of the question. Split your plan in two:
+TERMS_PROMPT = """List 5-10 grep terms for searching the user's work notes.
 
-"terms" - the concrete things actually named in the question: tool names,
-ticket keys, people, channels, repos, services. 2-5 of them.
+Include the concrete things the question names (tool names, ticket keys,
+people, channels) AND the words the notes probably use for the same idea in a
+full-stack project: synonyms, the implementation-level name, common
+abbreviations. A question about a "job" should also search worker, queue,
+cron, scheduler, task. A question about "login": auth, session, token, sso.
 
-"related" - the words the notes are likely to use for the same idea in a
-full-stack software project: synonyms, the implementation-level name, the
-layer above and below, and common abbreviations. 3-8 of them. For a question
-about a "job" that would be worker, queue, cron, scheduler, task, celery.
-For "login": auth, session, token, oauth, sso.
-
-Rules:
-- Search is a case-insensitive substring match, so prefer short stems
-  ("deploy" also finds deployment, deployed) and use no regex characters.
-- One or two words per entry.
-- Skip generic filler: issue, thing, update, status, work, problem.
+Search is case-insensitive substring, so use short stems ("deploy" finds
+deployment) and no regex characters. One or two words each. Skip filler like
+issue, thing, update, status.
 
 Respond with ONE JSON object and nothing else:
-{"terms": ["term1"], "related": ["term2"]}
+{"terms": ["term1", "term2"]}
 """
 
 ANSWER_PROMPT = """You answer questions about the user's own work, using only
@@ -38,27 +31,16 @@ the notes provided. The notes contain links (Slack, Jira, GitLab).
 MAX_CONTEXT_CHARS = 24000
 
 
-def _clean(values) -> list[str]:
-    if not isinstance(values, list):
-        return []
-    return [str(v).strip() for v in values if str(v).strip()]
-
-
 def ask(cfg: Config, question: str) -> str:
     llm = LLM(cfg.lmstudio)
 
     data = llm.json_chat(TERMS_PROMPT, question)
-    terms = _clean(data.get("terms"))
-    related = [t for t in _clean(data.get("related")) if t.lower() not in
-               {t.lower() for t in terms}]
-    if not terms and not related:
+    terms = [str(t) for t in data.get("terms", []) if str(t).strip()]
+    if not terms:
         terms = [question]
-    if terms:
-        print("searching for: " + ", ".join(terms))
-    if related:
-        print("also trying: " + ", ".join(related))
+    print("searching for: " + ", ".join(terms))
 
-    files = top_files(cfg.vault, terms, related)
+    files = top_files(cfg.vault, terms)
     if not files:
         return "No notes matched. Try `work-helper search <term>` to check the vault."
 
