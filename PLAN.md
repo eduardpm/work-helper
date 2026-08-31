@@ -8,7 +8,7 @@ ticket?" and the tool finds the answer with ripgrep plus the local model.
 ## Decisions made
 
 - Meeting transcripts are out of scope. I write my own notes and drop them in a folder.
-- Language: Python. Target Python 3.9 (the system Python on this machine).
+- Language: Python, managed with uv (`.python-version` pins 3.12, `uv sync` sets up everything).
 - All processing stays local. LM Studio serves the model at `http://localhost:1234/v1`.
 - Tokens live in environment variables, never in config files or the vault.
 - The tool runs on a company laptop. Keep dependencies few and well known.

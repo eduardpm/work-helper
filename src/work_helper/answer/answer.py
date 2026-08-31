@@ -4,10 +4,27 @@ from ..config import Config
 from ..indexer.llm import LLM
 from .search import top_files
 
-TERMS_PROMPT = """Extract 2-5 short search terms from the user's question about
-their work notes. Prefer concrete nouns: tool names, ticket keys, people,
-channels. Respond with ONE JSON object and nothing else:
-{"terms": ["term1", "term2"]}
+TERMS_PROMPT = """You build a search plan for a grep over the user's work
+notes. The user rarely uses the same words as the notes, so do not just copy
+words out of the question. Split your plan in two:
+
+"terms" - the concrete things actually named in the question: tool names,
+ticket keys, people, channels, repos, services. 2-5 of them.
+
+"related" - the words the notes are likely to use for the same idea in a
+full-stack software project: synonyms, the implementation-level name, the
+layer above and below, and common abbreviations. 3-8 of them. For a question
+about a "job" that would be worker, queue, cron, scheduler, task, celery.
+For "login": auth, session, token, oauth, sso.
+
+Rules:
+- Search is a case-insensitive substring match, so prefer short stems
+  ("deploy" also finds deployment, deployed) and use no regex characters.
+- One or two words per entry.
+- Skip generic filler: issue, thing, update, status, work, problem.
+
+Respond with ONE JSON object and nothing else:
+{"terms": ["term1"], "related": ["term2"]}
 """
 
 ANSWER_PROMPT = """You answer questions about the user's own work, using only
@@ -21,16 +38,27 @@ the notes provided. The notes contain links (Slack, Jira, GitLab).
 MAX_CONTEXT_CHARS = 24000
 
 
+def _clean(values) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [str(v).strip() for v in values if str(v).strip()]
+
+
 def ask(cfg: Config, question: str) -> str:
     llm = LLM(cfg.lmstudio)
 
     data = llm.json_chat(TERMS_PROMPT, question)
-    terms = [str(t) for t in data.get("terms", []) if str(t).strip()]
-    if not terms:
+    terms = _clean(data.get("terms"))
+    related = [t for t in _clean(data.get("related")) if t.lower() not in
+               {t.lower() for t in terms}]
+    if not terms and not related:
         terms = [question]
-    print("searching for: " + ", ".join(terms))
+    if terms:
+        print("searching for: " + ", ".join(terms))
+    if related:
+        print("also trying: " + ", ".join(related))
 
-    files = top_files(cfg.vault, terms)
+    files = top_files(cfg.vault, terms, related)
     if not files:
         return "No notes matched. Try `work-helper search <term>` to check the vault."
 

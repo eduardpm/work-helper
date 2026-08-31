@@ -6,11 +6,11 @@ vault. See [PLAN.md](PLAN.md) for the design.
 
 ## Setup
 
+Needs [uv](https://docs.astral.sh/uv/) (`brew install uv`). uv installs the
+right Python and all dependencies on its own.
+
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -e ".[dev]"
+uv sync
 cp config.example.yaml config.yaml   # then edit it
 ```
 
@@ -29,10 +29,10 @@ enable the local server. Put the model name in `config.yaml`.
 ## Use
 
 ```bash
-work-helper collect          # fetch new items -> vault/raw/<date>/
-work-helper index            # LM Studio categorizes -> vault/topics/, vault/daily/
-work-helper ask "what is left to do on the renovate ticket?"
-work-helper search renovate  # plain ripgrep, no LLM
+uv run work-helper collect          # fetch new items -> vault/raw/<date>/
+uv run work-helper index            # LM Studio categorizes -> vault/topics/, vault/daily/
+uv run work-helper ask "what is left to do on the renovate ticket?"
+uv run work-helper search renovate  # plain ripgrep, no LLM
 ```
 
 Open the vault folder in Obsidian to browse topics and daily notes.
@@ -40,6 +40,6 @@ Open the vault folder in Obsidian to browse topics and daily notes.
 ## Tests
 
 ```bash
-pytest
+uv run pytest
 ```
 # work-helper
