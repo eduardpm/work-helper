@@ -4,17 +4,13 @@ from datetime import datetime, timezone
 
 from ..config import Config, require_env
 from ..state import State
-from .base import RawItem, save_raw
-
-
-def _ts_to_iso(ts: str) -> str:
-    return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+from .base import RawItem, iso, save_raw
 
 
 def collect(cfg: Config, state: State) -> int:
     from slack_sdk import WebClient
 
-    if not cfg.slack.channels:
+    if not cfg.slack_channels:
         print("slack: no channels configured, skipping")
         return 0
 
@@ -37,9 +33,9 @@ def collect(cfg: Config, state: State) -> int:
         return names[user_id]
 
     count = 0
-    for channel in cfg.slack.channels:
+    for channel in cfg.slack_channels:
         cursor_key = f"slack:{channel}"
-        oldest = state.get_cursor(cursor_key, "0")
+        oldest = state.cursors.get(cursor_key, "0")
         latest_seen = float(oldest)
         page_cursor = None
 
@@ -71,7 +67,7 @@ def collect(cfg: Config, state: State) -> int:
                     id=f"slack-{channel}-{ts}",
                     url=url,
                     author=name(msg.get("user")),
-                    timestamp=_ts_to_iso(ts),
+                    timestamp=iso(datetime.fromtimestamp(float(ts), tz=timezone.utc)),
                     title=msg["text"][:80],
                     content="\n".join(lines),
                     extra={"channel": channel, "replies": msg.get("reply_count", 0)},
@@ -84,7 +80,7 @@ def collect(cfg: Config, state: State) -> int:
             else:
                 break
 
-        state.set_cursor(cursor_key, "{:.6f}".format(latest_seen))
+        state.cursors[cursor_key] = "{:.6f}".format(latest_seen)
 
     print(f"slack: saved {count} items")
     return count

@@ -1,50 +1,64 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import yaml
+from pydantic import BaseModel, field_validator, model_validator
 
 
-@dataclass
-class LMStudioConfig:
+class LMStudioConfig(BaseModel):
     base_url: str = "http://localhost:1234/v1"
     model: str = "qwen/qwen3-14b"
 
 
-@dataclass
-class SlackConfig:
-    channels: List[str] = field(default_factory=list)
-
-
-@dataclass
-class JiraConfig:
+class JiraConfig(BaseModel):
     base_url: str = ""
     jql: str = (
         'updated >= "{cursor}" AND '
         "(assignee = currentUser() OR reporter = currentUser())"
     )
 
-
-@dataclass
-class GitlabConfig:
-    base_url: str = ""
-
-
-@dataclass
-class Config:
-    vault: Path
-    notes_inbox: Path
-    lmstudio: LMStudioConfig
-    slack: SlackConfig
-    jira: JiraConfig
-    gitlab: GitlabConfig
+    @field_validator("base_url")
+    @classmethod
+    def _strip_slash(cls, v: str) -> str:
+        return v.rstrip("/")
 
 
-def _expand(p: str) -> Path:
-    return Path(os.path.expanduser(p)).resolve()
+def _expand(p) -> Path:
+    return Path(os.path.expanduser(str(p))).resolve()
+
+
+class Config(BaseModel):
+    vault: Path = Path("~/work-vault")
+    notes_inbox: Optional[Path] = None
+    lmstudio: LMStudioConfig = LMStudioConfig()
+    jira: JiraConfig = JiraConfig()
+    slack_channels: List[str] = []
+    gitlab_url: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _flatten(cls, data: dict) -> dict:
+        """config.yaml nests these; the code only ever wants the one value."""
+        data = dict(data or {})
+        data.setdefault("slack_channels", (data.get("slack") or {}).get("channels") or [])
+        data.setdefault("gitlab_url", (data.get("gitlab") or {}).get("base_url") or "")
+        return data
+
+    @field_validator("gitlab_url")
+    @classmethod
+    def _strip_slash(cls, v: str) -> str:
+        return v.rstrip("/")
+
+    @model_validator(mode="after")
+    def _resolve_paths(self):
+        self.vault = _expand(self.vault)
+        self.notes_inbox = (
+            _expand(self.notes_inbox) if self.notes_inbox else self.vault / "notes-inbox"
+        )
+        return self
 
 
 def find_config_path() -> Path:
@@ -63,30 +77,7 @@ def find_config_path() -> Path:
 def load_config(path: Path = None) -> Config:
     if path is None:
         path = find_config_path()
-    data = yaml.safe_load(path.read_text()) or {}
-
-    vault = _expand(data.get("vault", "~/work-vault"))
-    notes_inbox = _expand(data.get("notes_inbox", str(vault / "notes-inbox")))
-
-    lm = data.get("lmstudio", {}) or {}
-    slack = data.get("slack", {}) or {}
-    jira = data.get("jira", {}) or {}
-    gitlab = data.get("gitlab", {}) or {}
-
-    return Config(
-        vault=vault,
-        notes_inbox=notes_inbox,
-        lmstudio=LMStudioConfig(
-            base_url=lm.get("base_url", LMStudioConfig.base_url),
-            model=lm.get("model", LMStudioConfig.model),
-        ),
-        slack=SlackConfig(channels=list(slack.get("channels", []) or [])),
-        jira=JiraConfig(
-            base_url=(jira.get("base_url", "") or "").rstrip("/"),
-            jql=jira.get("jql", JiraConfig.jql),
-        ),
-        gitlab=GitlabConfig(base_url=(gitlab.get("base_url", "") or "").rstrip("/")),
-    )
+    return Config(**(yaml.safe_load(path.read_text()) or {}))
 
 
 def require_env(name: str) -> str:

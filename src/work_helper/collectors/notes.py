@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from ..config import Config
 from ..state import State
-from .base import RawItem, save_raw
+from .base import RawItem, iso, save_raw
 
 
 def collect(cfg: Config, state: State) -> int:
@@ -18,9 +18,7 @@ def collect(cfg: Config, state: State) -> int:
         if path.suffix.lower() not in (".md", ".txt") or not path.is_file():
             continue
         mtime = path.stat().st_mtime
-        timestamp = datetime.fromtimestamp(mtime, tz=timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        timestamp = iso(datetime.fromtimestamp(mtime, tz=timezone.utc))
         slug = re.sub(r"[^A-Za-z0-9_-]", "-", path.stem)
         item = RawItem(
             source="notes",

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Sequence
+from typing import List
 
 
 def _grep_cmd() -> List[str]:
@@ -15,34 +14,24 @@ def _grep_cmd() -> List[str]:
     return ["grep", "-r", "-i", "-n"]
 
 
-def search(vault: Path, term: str, folder: str = "") -> List[str]:
+def search(vault: Path, term: str) -> List[str]:
     """Return matching lines as 'path:line:text'."""
-    root = vault / folder if folder else vault
-    cmd = _grep_cmd() + [term, str(root)]
+    cmd = _grep_cmd() + [term, str(vault)]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode not in (0, 1):  # 1 = no matches
         raise RuntimeError(result.stderr.strip())
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
-MAX_WORKERS = 8
-
-
-def search_many(vault: Path, terms: Sequence[str]) -> List[List[str]]:
-    """Run one grep per term, concurrently. Each grep blocks on a child
-    process, so threads overlap them."""
-    if len(terms) < 2:
-        return [search(vault, t) for t in terms]
-    workers = min(len(terms), MAX_WORKERS, (os.cpu_count() or 4) * 2)
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(lambda t: search(vault, t), terms))
-
-
 def top_files(vault: Path, terms: List[str], limit: int = 5) -> List[Path]:
     """Files with the most matches across all terms. Topic notes rank
-    before raw JSON because they are already summarized."""
+    before raw JSON because they are already summarized. One grep per term,
+    run concurrently: each blocks on a child process, so threads overlap."""
+    with ThreadPoolExecutor(max_workers=min(len(terms), 8) or 1) as pool:
+        results = list(pool.map(lambda t: search(vault, t), terms))
+
     counts: Counter = Counter()
-    for lines in search_many(vault, terms):
+    for lines in results:
         for line in lines:
             path = line.split(":", 1)[0]
             if "/raw/" in path or "/.state" in path:

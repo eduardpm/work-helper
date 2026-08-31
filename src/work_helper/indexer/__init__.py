@@ -16,7 +16,7 @@ def run_index(cfg: Config) -> int:
     count = 0
     for path in iter_raw_files(cfg.vault):
         item = load_raw(path)
-        if state.is_processed(item.id):
+        if item.id in state.processed:
             continue
         try:
             idx = categorize(llm, item, topics)
@@ -27,7 +27,7 @@ def run_index(cfg: Config) -> int:
         update_daily(cfg.vault, item, idx)
         if idx.topic not in topics:
             topics.append(idx.topic)
-        state.mark_processed(item.id)
+        state.processed.add(item.id)
         state.save()  # save per item, so a crash loses nothing
         count += 1
         print(f"  {item.id} -> topics/{idx.topic}.md")

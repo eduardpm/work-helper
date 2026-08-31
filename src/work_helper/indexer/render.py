@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 import yaml
 
-from ..collectors.base import RawItem, utc_now_iso
+from ..collectors.base import RawItem, iso
 from .categorize import ItemIndex
 
 TODO_HEADING = "## TODO"
@@ -54,13 +54,11 @@ def render_topic(meta: dict, title: str, todos: List[str], log_body: str) -> str
 
 
 def _merge_list(existing, new_items) -> List[str]:
-    result = list(existing or [])
-    seen = {str(x).lower() for x in result}
-    for item in new_items:
-        if item.lower() not in seen:
-            result.append(item)
-            seen.add(item.lower())
-    return result
+    """First spelling of each entry wins, order preserved."""
+    seen = {}
+    for x in list(existing or []) + list(new_items):
+        seen.setdefault(str(x).lower(), str(x))
+    return list(seen.values())
 
 
 def _todo_text(line: str) -> str:
@@ -80,7 +78,7 @@ def update_topic(vault: Path, item: RawItem, idx: ItemIndex) -> Path:
     meta["tags"] = _merge_list(meta.get("tags"), idx.tags)
     meta["people"] = _merge_list(meta.get("people"), idx.people)
     meta["refs"] = _merge_list(meta.get("refs"), idx.refs)
-    meta["updated"] = utc_now_iso()[:10]
+    meta["updated"] = iso()[:10]
 
     existing_texts = {_todo_text(t) for t in todos}
     for todo in idx.todos:
@@ -97,7 +95,7 @@ def update_topic(vault: Path, item: RawItem, idx: ItemIndex) -> Path:
 
 
 def update_daily(vault: Path, item: RawItem, idx: ItemIndex) -> Path:
-    day = item.timestamp[:10] or utc_now_iso()[:10]
+    day = item.timestamp[:10] or iso()[:10]
     path = vault / "daily" / f"{day}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
 

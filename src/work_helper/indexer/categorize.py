@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
+
+from pydantic import BaseModel, field_validator
 
 from ..collectors.base import RawItem
 from .llm import LLM
@@ -32,15 +33,37 @@ Rules:
 """
 
 
-@dataclass
-class ItemIndex:
-    topic: str
-    topic_title: str
-    summary: str
-    tags: List[str] = field(default_factory=list)
-    people: List[str] = field(default_factory=list)
-    todos: List[str] = field(default_factory=list)
-    refs: List[str] = field(default_factory=list)
+class ItemIndex(BaseModel):
+    """The model's JSON, coerced into shape. Everything here arrives from an
+    LLM, so every field is cleaned rather than trusted."""
+
+    topic: str = "misc"
+    topic_title: str = "Untitled"
+    summary: str = ""
+    tags: List[str] = []
+    people: List[str] = []
+    todos: List[str] = []
+    refs: List[str] = []
+
+    @field_validator("topic", mode="before")
+    @classmethod
+    def _slug(cls, v) -> str:
+        return normalize_slug(str(v or "misc"))
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def _strip(cls, v) -> str:
+        return str(v or "").strip()
+
+    @field_validator("tags", "people", "todos", "refs", mode="before")
+    @classmethod
+    def _drop_blanks(cls, v) -> List[str]:
+        return [str(x).strip() for x in (v or []) if str(x).strip()]
+
+    @field_validator("tags")
+    @classmethod
+    def _lower(cls, v: List[str]) -> List[str]:
+        return [t.lower() for t in v]
 
 
 def normalize_slug(text: str) -> str:
@@ -70,17 +93,6 @@ def categorize(llm: LLM, item: RawItem, existing_topics: List[str]) -> ItemIndex
     )
 
     data = llm.json_chat(SYSTEM_PROMPT, user)
-
-    def str_list(key: str) -> List[str]:
-        value = data.get(key) or []
-        return [str(v).strip() for v in value if str(v).strip()]
-
-    return ItemIndex(
-        topic=normalize_slug(str(data.get("topic", "misc"))),
-        topic_title=str(data.get("topic_title") or item.title or "Untitled"),
-        summary=str(data.get("summary", "")).strip(),
-        tags=[t.lower() for t in str_list("tags")],
-        people=str_list("people"),
-        todos=str_list("todos"),
-        refs=str_list("refs"),
-    )
+    if not data.get("topic_title"):
+        data["topic_title"] = item.title or "Untitled"
+    return ItemIndex(**data)

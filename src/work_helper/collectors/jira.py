@@ -18,7 +18,7 @@ def collect(cfg: Config, state: State) -> int:
         return 0
 
     auth = (require_env("JIRA_EMAIL"), require_env("JIRA_TOKEN"))
-    cursor = state.get_cursor("jira")
+    cursor = state.cursors.get("jira")
     if not cursor:
         cursor = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
     run_started = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -80,6 +80,6 @@ def collect(cfg: Config, state: State) -> int:
             if start_at >= data.get("total", 0) or not data.get("issues"):
                 break
 
-    state.set_cursor("jira", run_started)
+    state.cursors["jira"] = run_started
     print(f"jira: saved {count} items")
     return count

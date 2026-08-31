@@ -7,22 +7,20 @@ import httpx
 
 from ..config import Config, require_env
 from ..state import State
-from .base import RawItem, save_raw, utc_now_iso
+from .base import RawItem, iso, save_raw
 
 
 def collect(cfg: Config, state: State) -> int:
-    if not cfg.gitlab.base_url:
+    if not cfg.gitlab_url:
         print("gitlab: no base_url configured, skipping")
         return 0
 
     headers = {"PRIVATE-TOKEN": require_env("GITLAB_TOKEN")}
-    api = f"{cfg.gitlab.base_url}/api/v4"
-    cursor = state.get_cursor("gitlab")
+    api = f"{cfg.gitlab_url}/api/v4"
+    cursor = state.cursors.get("gitlab")
     if not cursor:
-        cursor = (datetime.now(timezone.utc) - timedelta(days=7)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
-    run_started = utc_now_iso()
+        cursor = iso(datetime.now(timezone.utc) - timedelta(days=7))
+    run_started = iso()
 
     count = 0
     with httpx.Client(headers=headers, timeout=30) as client:
@@ -81,6 +79,6 @@ def collect(cfg: Config, state: State) -> int:
             save_raw(cfg.vault, item)
             count += 1
 
-    state.set_cursor("gitlab", run_started)
+    state.cursors["gitlab"] = run_started
     print(f"gitlab: saved {count} items")
     return count
