@@ -10,8 +10,8 @@ def test_extract_json_plain():
 
 
 def test_extract_json_with_think_and_fence():
-    text = '<think>hmm {not json}</think>\n```json\n{"topic": "x"}\n```'
-    assert extract_json(text) == {"topic": "x"}
+    text = '<think>hmm {not json}</think>\n```json\n{"epics": ["x"]}\n```'
+    assert extract_json(text) == {"epics": ["x"]}
 
 
 def test_extract_json_fails_loudly():
@@ -36,8 +36,8 @@ class FakeLLM:
 def test_categorize_normalizes_output():
     llm = FakeLLM(
         {
-            "topic": "Renovate Config",
-            "topic_title": "Renovate config",
+            "epics": ["Stock Depletion", "stock-depletion", "misc"],
+            "event": "Blocker",
             "tags": ["Renovate", ""],
             "people": ["Anna"],
             "summary": " Discussed schedule. ",
@@ -49,8 +49,20 @@ def test_categorize_normalizes_output():
         source="slack", id="x", url="", author="anna",
         timestamp="2026-08-31T10:00:00Z", title="t", content="c",
     )
-    idx = categorize(llm, item, ["other-topic"])
-    assert idx.topic == "renovate-config"
+    idx = categorize(llm, item, ["other-epic"])
+    assert idx.epics == ["stock-depletion", "misc"]  # deduped, slugged
+    assert idx.event == "blocker"
     assert idx.tags == ["renovate"]
     assert idx.summary == "Discussed schedule."
-    assert "other-topic" in llm.last_user
+    assert "other-epic" in llm.last_user
+
+
+def test_categorize_bad_epics_fall_back():
+    llm = FakeLLM({"epics": [], "event": "party", "summary": "x"})
+    item = RawItem(
+        source="slack", id="x", url="", author="a",
+        timestamp="2026-08-31T10:00:00Z", title="t", content="c",
+    )
+    idx = categorize(llm, item, [])
+    assert idx.epics == ["misc"]
+    assert idx.event == ""

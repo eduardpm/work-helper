@@ -2,53 +2,82 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List
 
 from pydantic import BaseModel, field_validator
 
 from ..collectors.base import RawItem
 from .llm import LLM
 
-SYSTEM_PROMPT = """You index one work item into a personal knowledge vault.
-The vault has one Markdown note per topic (a "topic" is one thread of work,
-e.g. one ticket, one feature, one recurring theme).
+EVENT_KINDS = ("decision", "blocker", "discovery", "question", "progress")
+
+SYSTEM_PROMPT = """You index one work item into a personal knowledge base
+organized as EPICS: big threads of work (a feature, an initiative, a concept
+under discussion, a recurring theme), like Jira epics. One item can belong to
+more than one epic.
 
 Respond with ONE JSON object and nothing else:
-{
-  "topic": "kebab-case-slug",
-  "topic_title": "Human readable topic title",
+{{
+  "epics": ["kebab-case-slug"],
+  "event": "",
   "tags": ["lowercase", "keywords"],
   "people": ["names mentioned or involved"],
-  "summary": "1-3 short sentences: what happened in this item",
+  "summary": "1-3 short sentences: what happened in this item, with names",
   "todos": ["open action items stated or clearly implied, empty list if none"],
   "refs": ["ticket keys like PROJ-123 or MR numbers like !45 mentioned in the item"]
-}
+}}
 
 Rules:
-- If the item belongs to one of the EXISTING TOPICS, reuse that exact slug.
-- Ticket keys and MR numbers are the strongest signal that items share a topic.
-- Only create a new topic when nothing existing fits.
+- epics: 1 to 3 slugs. Reuse an EXISTING EPICS slug whenever the item belongs
+  there. Only invent a new slug when nothing existing fits.
+- Ticket keys and MR numbers are the strongest signal that items share an epic.
+- event: what kind of development this item is, one of {kinds} —
+  or "" if none clearly fits.
 - todos: only real open work, not things already done.
 - Keep tags generic and reusable (e.g. "renovate", "ci", "deployment").
-"""
+""".format(kinds=", ".join(f'"{k}"' for k in EVENT_KINDS))
+
+STATE_PROMPT = """You maintain the "State" section of an epic note in a personal
+work knowledge base. The reader wants to catch up on this epic without reading
+every message, ticket, and PR behind it.
+
+Write 3-8 short sentences of plain Markdown (no headings, no lists required):
+- what this epic is about, in plain words
+- where it stands right now
+- open blockers, disagreements, or unanswered questions, with names
+
+Prefer newer log entries over older ones when they conflict. Do not repeat the
+log entry by entry. Respond with the State text only."""
 
 
 class ItemIndex(BaseModel):
     """The model's JSON, coerced into shape. Everything here arrives from an
     LLM, so every field is cleaned rather than trusted."""
 
-    topic: str = "misc"
-    topic_title: str = "Untitled"
+    epics: list[str] = ["misc"]
+    event: str = ""
     summary: str = ""
-    tags: List[str] = []
-    people: List[str] = []
-    todos: List[str] = []
-    refs: List[str] = []
+    tags: list[str] = []
+    people: list[str] = []
+    todos: list[str] = []
+    refs: list[str] = []
 
-    @field_validator("topic", mode="before")
+    @field_validator("epics", mode="before")
     @classmethod
-    def _slug(cls, v) -> str:
-        return normalize_slug(str(v or "misc"))
+    def _slugs(cls, v) -> list[str]:
+        if isinstance(v, str):
+            v = [v]
+        slugs = []
+        for x in v or []:
+            slug = normalize_slug(str(x))
+            if slug not in slugs:
+                slugs.append(slug)
+        return slugs[:3] or ["misc"]
+
+    @field_validator("event", mode="before")
+    @classmethod
+    def _event(cls, v) -> str:
+        v = str(v or "").strip().lower()
+        return v if v in EVENT_KINDS else ""
 
     @field_validator("summary", mode="before")
     @classmethod
@@ -57,12 +86,12 @@ class ItemIndex(BaseModel):
 
     @field_validator("tags", "people", "todos", "refs", mode="before")
     @classmethod
-    def _drop_blanks(cls, v) -> List[str]:
+    def _drop_blanks(cls, v) -> list[str]:
         return [str(x).strip() for x in (v or []) if str(x).strip()]
 
     @field_validator("tags")
     @classmethod
-    def _lower(cls, v: List[str]) -> List[str]:
+    def _lower(cls, v: list[str]) -> list[str]:
         return [t.lower() for t in v]
 
 
@@ -71,28 +100,28 @@ def normalize_slug(text: str) -> str:
     return slug[:60] or "misc"
 
 
-def list_topics(vault: Path) -> List[str]:
-    folder = vault / "topics"
+def title_for(slug: str) -> str:
+    return slug.replace("-", " ").capitalize()
+
+
+def list_epics(vault: Path) -> list[str]:
+    folder = vault / "epics"
     if not folder.exists():
         return []
     return sorted(p.stem for p in folder.glob("*.md"))
 
 
-def categorize(llm: LLM, item: RawItem, existing_topics: List[str]) -> ItemIndex:
-    topics_block = "\n".join(f"- {t}" for t in existing_topics) or "(none yet)"
+def categorize(llm: LLM, item: RawItem, existing_epics: list[str]) -> ItemIndex:
+    epics_block = "\n".join(f"- {e}" for e in existing_epics) or "(none yet)"
     user = (
-        "EXISTING TOPICS:\n{}\n\n"
-        "ITEM (source: {}, author: {}, date: {}, title: {}):\n{}"
-    ).format(
-        topics_block,
-        item.source,
-        item.author,
-        item.timestamp[:10],
-        item.title,
-        item.content[:6000],
+        f"EXISTING EPICS:\n{epics_block}\n\n"
+        f"ITEM (source: {item.source}, author: {item.author}, date: {item.timestamp[:10]}, title: {item.title}):\n{item.content[:6000]}"
     )
+    return ItemIndex(**llm.json_chat(SYSTEM_PROMPT, user))
 
-    data = llm.json_chat(SYSTEM_PROMPT, user)
-    if not data.get("topic_title"):
-        data["topic_title"] = item.title or "Untitled"
-    return ItemIndex(**data)
+
+def summarize_state(llm: LLM, title: str, state: str, log_body: str) -> str:
+    user = "EPIC: {}\n\nCURRENT STATE:\n{}\n\nLOG (newest first):\n{}".format(
+        title, state or "(empty)", log_body[:8000]
+    )
+    return llm.chat(STATE_PROMPT, user).strip()

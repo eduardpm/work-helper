@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List, Optional
 
 import yaml
 from pydantic import BaseModel, field_validator, model_validator
@@ -32,10 +31,10 @@ def _expand(p) -> Path:
 
 class Config(BaseModel):
     vault: Path = Path("~/work-vault")
-    notes_inbox: Optional[Path] = None
+    notes_inbox: Path | None = None
     lmstudio: LMStudioConfig = LMStudioConfig()
     jira: JiraConfig = JiraConfig()
-    slack_channels: List[str] = []
+    slack_channels: list[str] = []
     gitlab_url: str = ""
 
     @model_validator(mode="before")
@@ -43,7 +42,9 @@ class Config(BaseModel):
     def _flatten(cls, data: dict) -> dict:
         """config.yaml nests these; the code only ever wants the one value."""
         data = dict(data or {})
-        data.setdefault("slack_channels", (data.get("slack") or {}).get("channels") or [])
+        data.setdefault(
+            "slack_channels", (data.get("slack") or {}).get("channels") or []
+        )
         data.setdefault("gitlab_url", (data.get("gitlab") or {}).get("base_url") or "")
         return data
 
@@ -56,7 +57,9 @@ class Config(BaseModel):
     def _resolve_paths(self):
         self.vault = _expand(self.vault)
         self.notes_inbox = (
-            _expand(self.notes_inbox) if self.notes_inbox else self.vault / "notes-inbox"
+            _expand(self.notes_inbox)
+            if self.notes_inbox
+            else self.vault / "notes-inbox"
         )
         return self
 
@@ -65,7 +68,10 @@ def find_config_path() -> Path:
     env = os.environ.get("WORK_HELPER_CONFIG")
     if env:
         return _expand(env)
-    for candidate in (Path("config.yaml"), Path.home() / ".config/work-helper/config.yaml"):
+    for candidate in (
+        Path("config.yaml"),
+        Path.home() / ".config/work-helper/config.yaml",
+    ):
         if candidate.exists():
             return candidate.resolve()
     raise FileNotFoundError(

@@ -80,7 +80,7 @@ def collect(cfg: Config, state: State) -> int:
             else:
                 break
 
-        state.cursors[cursor_key] = "{:.6f}".format(latest_seen)
+        state.cursors[cursor_key] = f"{latest_seen:.6f}"
 
     print(f"slack: saved {count} items")
     return count

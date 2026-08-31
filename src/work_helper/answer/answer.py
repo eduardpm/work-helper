@@ -4,7 +4,7 @@ from ..config import Config
 from ..indexer.llm import LLM
 from .search import top_files
 
-TERMS_PROMPT = """List 5-10 grep terms for searching the user's work notes.
+TERMS_PROMPT = """list 5-10 grep terms for searching the user's work notes.
 
 Include the concrete things the question names (tool names, ticket keys,
 people, channels) AND the words the notes probably use for the same idea in a

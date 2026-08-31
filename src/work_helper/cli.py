@@ -36,6 +36,12 @@ def cmd_index(cfg, args) -> int:
     return 0
 
 
+def cmd_sync(cfg, args) -> int:
+    args.source = "all"
+    cmd_collect(cfg, args)
+    return cmd_index(cfg, args)
+
+
 def cmd_ask(cfg, args) -> int:
     from .answer.answer import ask
 
@@ -68,6 +74,9 @@ def main(argv=None) -> int:
 
     p_index = sub.add_parser("index", help="categorize raw items with LM Studio")
     p_index.set_defaults(func=cmd_index)
+
+    p_sync = sub.add_parser("sync", help="collect all sources, then index")
+    p_sync.set_defaults(func=cmd_sync)
 
     p_ask = sub.add_parser("ask", help="answer a question from the vault")
     p_ask.add_argument("question")

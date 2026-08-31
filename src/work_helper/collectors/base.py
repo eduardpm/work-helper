@@ -3,17 +3,16 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
 
 from pydantic import BaseModel, Field
 
 
 class RawItem(BaseModel):
-    source: str          # slack | jira | gitlab | notes
-    id: str              # stable across re-fetches, e.g. "slack-C0123-1725000000.000100"
-    url: str             # permalink, may be empty for notes
+    source: str  # slack | jira | gitlab | notes
+    id: str  # stable across re-fetches, e.g. "slack-C0123-1725000000.000100"
+    url: str  # permalink, may be empty for notes
     author: str
-    timestamp: str       # ISO 8601
+    timestamp: str  # ISO 8601
     title: str
     content: str
     extra: dict = Field(default_factory=dict)
@@ -38,7 +37,7 @@ def load_raw(path: Path) -> RawItem:
     return RawItem.model_validate_json(path.read_text())
 
 
-def iter_raw_files(vault: Path) -> List[Path]:
+def iter_raw_files(vault: Path) -> list[Path]:
     return sorted((vault / "raw").glob("*/*.json"))
 
 

@@ -5,25 +5,24 @@ import subprocess
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List
 
 
-def _grep_cmd() -> List[str]:
+def _grep_cmd() -> list[str]:
     if shutil.which("rg"):
         return ["rg", "-i", "--no-heading", "--line-number"]
     return ["grep", "-r", "-i", "-n"]
 
 
-def search(vault: Path, term: str) -> List[str]:
+def search(vault: Path, term: str) -> list[str]:
     """Return matching lines as 'path:line:text'."""
     cmd = _grep_cmd() + [term, str(vault)]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     if result.returncode not in (0, 1):  # 1 = no matches
         raise RuntimeError(result.stderr.strip())
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
-def top_files(vault: Path, terms: List[str], limit: int = 5) -> List[Path]:
+def top_files(vault: Path, terms: list[str], limit: int = 5) -> list[Path]:
     """Files with the most matches across all terms. Topic notes rank
     before raw JSON because they are already summarized. One grep per term,
     run concurrently: each blocks on a child process, so threads overlap."""
