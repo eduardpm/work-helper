@@ -1,0 +1,24 @@
+[project]
+name = "work-helper"
+version = "0.1.0"
+description = "Collect work data (Slack, Jira, GitLab, notes), categorize with a local LLM, store in an Obsidian vault."
+requires-python = ">=3.9"
+dependencies = [
+    "slack-sdk>=3.27",
+    "httpx>=0.27",
+    "PyYAML>=6.0",
+    "openai>=1.40",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+work-helper = "work_helper.cli:main"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

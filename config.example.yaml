@@ -1,0 +1,22 @@
+# Copy to config.yaml and edit. config.yaml is gitignored.
+# Secrets go in environment variables, not here:
+#   SLACK_TOKEN, JIRA_EMAIL, JIRA_TOKEN, GITLAB_TOKEN
+
+vault: ~/work-vault
+notes_inbox: ~/work-vault/notes-inbox
+
+lmstudio:
+  base_url: http://localhost:1234/v1
+  model: qwen/qwen3-14b
+
+slack:
+  # Channel IDs (C...), not names. Right-click a channel in Slack -> copy link.
+  channels: []
+
+jira:
+  base_url: https://your-company.atlassian.net
+  # {cursor} is replaced with the last fetch time. First run uses -7d.
+  jql: 'updated >= "{cursor}" AND (assignee = currentUser() OR reporter = currentUser() OR comment ~ currentUser())'
+
+gitlab:
+  base_url: https://gitlab.your-company.com
