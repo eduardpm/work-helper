@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -12,6 +13,7 @@ TODO_HEADING = "## TODO"
 LOG_HEADING = "## Log"
 
 NO_STATE = "(no state summary yet)"
+DUE_MARK = re.compile(r"\s*📅\s*(\d{4}-\d{2}-\d{2})")  # Obsidian Tasks due-date format
 
 
 def epic_path(vault: Path, slug: str) -> Path:
@@ -46,11 +48,13 @@ def parse_epic(text: str) -> tuple[dict, str, str, list[str], str]:
     if TODO_HEADING in body:
         after_todo = body.split(TODO_HEADING, 1)[1]
         todo_section = after_todo.split(LOG_HEADING, 1)[0]
-        todos = [
-            line.strip()
-            for line in todo_section.splitlines()
-            if line.strip().startswith("- [")
-        ]
+        # one entry per checkbox line; indented lines below it (the description) stay attached
+        for line in todo_section.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("- ["):
+                todos.append(stripped)
+            elif todos and stripped and line[:1] in (" ", "\t"):
+                todos[-1] += "\n    " + stripped
     if LOG_HEADING in body:
         log_body = body.split(LOG_HEADING, 1)[1].strip("\n")
 
@@ -77,7 +81,9 @@ def _merge_list(existing, new_items) -> list[str]:
 
 
 def _todo_text(line: str) -> str:
-    return line.split("]", 1)[-1].strip().lower()
+    """Comparable task title: first line, without checkbox, date marker, or description."""
+    head = line.split("\n", 1)[0].split("]", 1)[-1]
+    return DUE_MARK.sub("", head).strip().lower()
 
 
 def update_epic(vault: Path, item: RawItem, idx: ItemIndex, slug: str) -> Path:

@@ -12,6 +12,15 @@ class LMStudioConfig(BaseModel):
     model: str = "qwen/qwen3-14b"
 
 
+class CodexConfig(BaseModel):
+    """`codex exec` settings for the dashboard chat."""
+
+    command: str = "codex"
+    model: str = "gpt-5.6-luna"
+    reasoning: str = "high"
+    timeout: int = 600  # seconds per reply
+
+
 class JiraConfig(BaseModel):
     base_url: str = ""
     jql: str = (
@@ -34,6 +43,7 @@ class Config(BaseModel):
     notes_inbox: Path | None = None
     lmstudio: LMStudioConfig = LMStudioConfig()
     jira: JiraConfig = JiraConfig()
+    codex: CodexConfig = CodexConfig()
     slack_channels: list[str] = []
     gitlab_url: str = ""
 

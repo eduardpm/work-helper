@@ -3,29 +3,17 @@ from __future__ import annotations
 import argparse
 import sys
 
+from .collectors import SOURCES, collect_sources
 from .config import load_config
-from .state import State
-
-SOURCES = ("slack", "jira", "gitlab", "notes")
 
 
 def cmd_collect(cfg, args) -> int:
-    from .collectors import gitlab, jira, notes, slack
-
-    modules = {"slack": slack, "jira": jira, "gitlab": gitlab, "notes": notes}
     wanted = SOURCES if args.source == "all" else (args.source,)
-
-    state = State(cfg.vault)
-    total = 0
-    for name in wanted:
-        try:
-            total += modules[name].collect(cfg, state)
-        except SystemExit as exc:
-            print(f"{name}: {exc}")
-        except Exception as exc:
-            print(f"{name}: FAILED: {exc}")
-    state.save()
-    print(f"collected {total} items total")
+    results = collect_sources(cfg, wanted)
+    for name, result in results.items():
+        if not isinstance(result, int):
+            print(f"{name}: {result}")
+    print(f"collected {sum(r for r in results.values() if isinstance(r, int))} items total")
     return 0
 
 
@@ -40,6 +28,19 @@ def cmd_sync(cfg, args) -> int:
     args.source = "all"
     cmd_collect(cfg, args)
     return cmd_index(cfg, args)
+
+
+def cmd_dashboard(cfg, args) -> int:
+    from .dashboard import serve
+
+    vault = cfg.vault if cfg else None
+    if args.demo:
+        from .demo import seed_demo
+
+        vault = seed_demo()
+        print(f"demo vault: {vault}", flush=True)
+    serve(vault, args.port, open_browser=not args.no_open, cfg=cfg)
+    return 0
 
 
 def cmd_ask(cfg, args) -> int:
@@ -78,6 +79,12 @@ def main(argv=None) -> int:
     p_sync = sub.add_parser("sync", help="collect all sources, then index")
     p_sync.set_defaults(func=cmd_sync)
 
+    p_dash = sub.add_parser("dashboard", help="open the local dashboard app in the browser")
+    p_dash.add_argument("--port", type=int, default=8787)
+    p_dash.add_argument("--no-open", action="store_true", help="do not open the browser")
+    p_dash.add_argument("--demo", action="store_true", help="serve a throwaway vault with seed data")
+    p_dash.set_defaults(func=cmd_dashboard)
+
     p_ask = sub.add_parser("ask", help="answer a question from the vault")
     p_ask.add_argument("question")
     p_ask.set_defaults(func=cmd_ask)
@@ -90,9 +97,12 @@ def main(argv=None) -> int:
     try:
         cfg = load_config()
     except FileNotFoundError as exc:
-        print(exc, file=sys.stderr)
-        return 1
-    cfg.vault.mkdir(parents=True, exist_ok=True)
+        if not getattr(args, "demo", False):
+            print(exc, file=sys.stderr)
+            return 1
+        cfg = None  # --demo needs no config
+    if cfg:
+        cfg.vault.mkdir(parents=True, exist_ok=True)
     return args.func(cfg, args)
 
 

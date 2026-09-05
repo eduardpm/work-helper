@@ -41,7 +41,8 @@ vault/
   raw/2026-08-31/slack-C0123-1725000000.json   # one raw item per file
   epics/stock-depletion.md                     # one note per epic
   daily/2026-08-31.md                          # what happened that day
-  .state.json                                  # per-source cursors, processed IDs
+  tasks.md                                     # my own tasks (dashboard Tasks view)
+  .state.json                                  # per-source cursors, processed IDs, last sync times
 ```
 
 Epic notes carry YAML frontmatter (`tags`, `people`, `refs`, `updated`) and a
@@ -123,4 +124,11 @@ Secrets: `SLACK_TOKEN`, `JIRA_EMAIL`, `JIRA_TOKEN`, `GITLAB_TOKEN` in the env.
 
 - Meeting transcript ingestion.
 - Copying code into the vault. ripgrep searches the codebase in place.
-- A UI. Obsidian is the UI for reading; the terminal is the UI for asking.
+- A UI beyond Obsidian for reading and the terminal for asking. The one exception
+  is `work-helper dashboard`: a localhost page (stdlib `http.server`, one HTML
+  file) with a Tasks view (personal list in `tasks.md` + epic TODOs, add/tick
+  writes into the notes) and an Epics view (status, blockers, weekly activity,
+  state summary, and a chat panel per epic that runs `codex exec` in the vault
+  to answer questions or refine the note), plus last-sync times per integration
+  from `.state.json`.
+  Safari's Add to Dock makes it a Mac app without a native build.

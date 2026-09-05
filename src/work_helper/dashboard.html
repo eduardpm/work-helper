@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work helper</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8; --side: #ffffff; --card: #ffffff; --fg: #17181c; --muted: #5d606b; --border: #e2e4e9;
+    --primary: #0d9488; --on-primary: #ffffff; --primary-soft: #e6f6f4; --hover: #eef0f3;
+    --danger: #c02626; --warn: #b45309; --bar: #0d9488; --bar-empty: #e2e4e9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15161a; --side: #1a1b20; --card: #1f2026; --fg: #ececef; --muted: #9c9ea8; --border: #2c2d35;
+      --primary: #2dd4bf; --on-primary: #042f2e; --primary-soft: #143634; --hover: #262731;
+      --danger: #f87171; --warn: #fbbf24; --bar: #2dd4bf; --bar-empty: #2c2d35;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  [hidden] { display: none !important; }
+
+  .app { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100%; }
+  /* sidebar */
+  .side { background: var(--side); border-right: 1px solid var(--border); padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; padding: 4px 10px 16px; }
+  .brand .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; }
+  .nav { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; min-height: 40px; }
+  .nav:hover { background: var(--hover); }
+  .nav.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+  .nav .count { margin-left: auto; font-size: 12px; color: var(--muted); font-weight: 500; }
+  .nav.active .count { color: inherit; }
+  .side h2 { display: flex; align-items: center; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 20px 10px 6px; font-weight: 600; }
+  .side h2 button { margin-left: auto; border: 0; background: transparent; color: var(--primary); cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; padding: 4px 8px; border-radius: 6px; min-height: 28px; }
+  .side h2 button:hover { background: var(--hover); }
+  .sync { list-style: none; margin: 0; padding: 0; }
+  .sync li { display: grid; grid-template-columns: 10px 1fr auto; column-gap: 10px; align-items: center; padding: 4px 4px 4px 10px; font-size: 13px; }
+  .mini { width: 32px; height: 32px; border: 0; background: transparent; color: var(--muted); border-radius: 6px; cursor: pointer; display: grid; place-items: center; grid-row: span 2; }
+  .mini:hover { background: var(--hover); color: var(--fg); }
+  .mini svg.i { width: 15px; height: 15px; }
+  button:disabled { opacity: .5; cursor: progress; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: no-preference) { .spin svg { animation: spin 1s linear infinite; } }
+  .sync .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+  .sync .stale .dot, .sync .never .dot { background: var(--warn); }
+  .sync .never .dot { background: var(--muted); }
+  .sync .when { grid-column: 2; color: var(--muted); font-size: 12px; }
+  .sync .stale .when { color: var(--warn); }
+  .side .foot { margin-top: auto; padding: 10px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+
+  /* main */
+  main { padding: 24px 32px 48px; max-width: 1500px; width: 100%; min-width: 0; }
+  #view-tasks { max-width: 1040px; }
+  .top { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .top h1 { font-size: 22px; margin: 0; }
+  .top .sub { color: var(--muted); font-size: 14px; }
+  .top .meta { color: var(--muted); font-size: 13px; }
+  .top .search { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); min-width: 240px; height: 38px; color: var(--muted); }
+  .top .search input { border: 0; background: transparent; flex: 1; min-width: 0; height: 100%; color: var(--fg); }
+  .top .search input:focus { outline: none; }
+  .top .search:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); cursor: pointer; }
+  .btn:hover { background: var(--hover); }
+  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.icon { width: 38px; padding: 0; justify-content: center; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+
+  /* add task */
+  .add { display: flex; gap: 8px; padding: 8px; margin-bottom: 20px; }
+  .add input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 0; background: transparent; font-size: 16px; }
+  .add input:focus { outline: none; }
+  .add:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .add select { height: 40px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); max-width: 220px; }
+  .add .btn { height: 40px; }
+
+  /* task list */
+  .group { padding: 6px 8px 8px; }
+  .group + .group { border-top: 1px solid var(--border); }
+  .group h3 { display: flex; align-items: center; gap: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 8px 8px 4px; font-weight: 600; }
+  .group h3 .n { font-weight: 500; }
+  .task { display: flex; align-items: flex-start; gap: 4px; padding: 4px 4px 4px 0; border-radius: 8px; min-height: 44px; }
+  .task:hover { background: var(--hover); }
+  .tick { display: grid; place-items: center; width: 40px; height: 40px; cursor: pointer; flex: none; }
+  .tick input { width: 18px; height: 18px; margin: 0; accent-color: var(--primary); cursor: pointer; }
+  .task .tbody { flex: 1; min-width: 0; padding: 8px 0; }
+  .task .text { all: unset; display: block; cursor: pointer; font: inherit; color: inherit; overflow-wrap: anywhere; border-radius: 4px; }
+  .task .text:hover { text-decoration: underline dotted var(--muted); }
+  .task .text:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .task .desc { color: var(--muted); font-size: 13px; white-space: pre-wrap; margin-top: 2px; overflow-wrap: anywhere; }
+  .task .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; align-items: center; }
+  .task .chip { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .task .due { font-size: 12px; color: var(--primary); font-weight: 600; }
+  .task .due.overdue { color: var(--warn); }
+  .task .due.later { color: var(--muted); font-weight: 500; }
+  .task.done .text { color: var(--muted); text-decoration: line-through; }
+  .task .mini { margin-top: 4px; }
+  .task .mini.on { color: var(--primary); }
+  .edit textarea { width: 100%; min-height: 60px; field-sizing: content; resize: vertical; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--fg); font-size: 14px; }
+  .edit .title { font-weight: 600; margin-bottom: 6px; }
+  .edit-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .edit-actions .hint { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .ebody .task { min-height: 40px; }
+  details.done-wrap { margin-top: 20px; }
+  details.done-wrap > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; min-height: 44px; }
+  details.done-wrap > summary::-webkit-details-marker { display: none; }
+  details.done-wrap > summary .chev { transition: transform .15s; }
+  details.done-wrap[open] > summary .chev { transform: rotate(90deg); }
+  .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+  .empty strong { display: block; color: var(--fg); margin-bottom: 4px; }
+
+  /* epics: cards on the left, selected epic on the right */
+  .epics-layout { display: grid; grid-template-columns: minmax(340px, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+  .epic { border-bottom: 1px solid var(--border); }
+  .epic:last-child { border-bottom: 0; }
+  .epic summary { list-style: none; cursor: pointer; padding: 12px 16px; min-height: 56px; }
+  .epic summary::-webkit-details-marker { display: none; }
+  .epic summary:hover, .epic[open] summary { background: var(--hover); }
+  .epic.selected { box-shadow: inset 3px 0 0 var(--primary); }
+  .crow { display: flex; align-items: center; gap: 12px; }
+  .crow .name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmeta { font-size: 12px; color: var(--muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .cmeta b { color: var(--fg); font-weight: 600; }
+  .cmeta .alert { color: var(--danger); }
+  .badge { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+  .badge.new { color: var(--primary); border-color: var(--primary); }
+  .badge.active { color: var(--fg); }
+  svg.spark { display: block; width: 116px; height: 28px; flex: none; }
+  svg.spark rect { fill: var(--bar); }
+  svg.spark rect.zero { fill: var(--bar-empty); }
+  .ebody { padding: 4px 16px 16px; font-size: 14px; }
+  .ebody h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 12px 0 2px; font-weight: 600; }
+  .ebody .task { padding: 6px 8px; min-height: 36px; }
+  .ebody .meta { color: var(--muted); font-size: 12px; margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .detail { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow: auto; }
+  .detail-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .detail-head h2 { font-size: 18px; margin: 0; text-transform: none; letter-spacing: 0; color: var(--fg); flex: 1; min-width: 0; }
+  .detail-head .path { width: 100%; font-size: 12px; color: var(--muted); }
+  .detail-body { padding: 4px 20px 20px; font-size: 14px; }
+  .detail-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
+  .detail-body .state p { max-width: 72ch; font-size: 15px; }
+  .detail-body .log h4 { font-size: 13px; font-weight: 600; margin: 14px 0 2px; }
+  .detail-body .log p { color: var(--fg); max-width: 80ch; margin: 0 0 4px; }
+  .detail-body a { color: var(--primary); }
+  .detail-body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: var(--hover); padding: 1px 4px; border-radius: 4px; }
+  .detail .empty { padding: 60px 20px; }
+  @media (max-width: 1000px) { .epics-layout { grid-template-columns: 1fr; } .detail { position: static; max-height: none; } }
+
+  /* chat */
+  .chat { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+  .chat-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+  .chat-head button { margin-left: auto; border: 0; background: transparent; color: var(--primary); cursor: pointer; font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; min-height: 28px; text-transform: none; letter-spacing: 0; }
+  .chat-head button:hover { background: var(--hover); }
+  .chat-hint { padding: 0 12px 10px; font-size: 13px; color: var(--muted); max-width: 70ch; }
+  .chat-log { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 8px; max-height: 420px; overflow: auto; }
+  .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--primary); color: var(--on-primary); border-bottom-right-radius: 4px; white-space: pre-wrap; }
+  .msg.bot { align-self: flex-start; background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .msg.err { border-color: var(--danger); color: var(--danger); white-space: pre-wrap; }
+  .msg.busy { color: var(--muted); font-style: italic; }
+  .msg p { margin: 0 0 6px; } .msg p:last-child { margin: 0; }
+  .msg ul { margin: 0 0 6px; padding-left: 18px; }
+  .msg code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: var(--hover); padding: 1px 4px; border-radius: 4px; }
+  .msg a { color: var(--primary); }
+  .chat-form { display: flex; gap: 8px; padding: 8px 12px 12px; align-items: flex-end; }
+  .chat-form textarea { flex: 1; min-height: 40px; max-height: 160px; field-sizing: content; resize: none; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--fg); }
+  .chat-form textarea:disabled { opacity: .6; }
+  .chat-form .btn { height: 40px; }
+
+  /* activity feed (Changes, Blockers) */
+  .day { display: flex; align-items: center; gap: 10px; padding: 14px 16px 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+  .day .pill { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--primary); color: var(--on-primary); text-transform: none; letter-spacing: 0; }
+  .ev { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 10px 16px 10px 13px; border-top: 1px solid var(--border); border-left: 3px solid transparent; font-size: 14px; }
+  .ev.new { border-left-color: var(--primary); }
+  .kind { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 3px; }
+  .kind.blocker { color: var(--danger); } .kind.question { color: var(--warn); } .kind.decision { color: var(--primary); }
+  .evhead { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 13px; color: var(--muted); }
+  .evhead b { color: var(--fg); font-weight: 600; }
+  .evhead a { color: var(--primary); }
+  .evsum { margin-top: 2px; overflow-wrap: anywhere; }
+  .egroup h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 0; padding: 14px 16px 6px; font-weight: 600; }
+  .egroup h3 .n { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .egroup + .egroup { border-top: 1px solid var(--border); }
+  #view-feed, #view-ask { max-width: 1040px; }
+  #view-ask .chat { margin: 0; background: var(--card); }
+  #view-ask .chat-log { max-height: 60vh; }
+
+  /* toast */
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 12px 10px 16px; border-radius: 10px; display: flex; align-items: center; gap: 12px; font-size: 14px; max-width: min(90vw, 560px); z-index: 20; }
+  .toast button { border: 0; background: transparent; color: var(--primary); font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 6px; }
+  .toast button:hover { background: rgba(127,127,127,.2); }
+
+  @media (prefers-reduced-motion: no-preference) { .nav, .btn, .task, .epic summary { transition: background .15s; } }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); min-width: 0; }
+    .side .foot { display: none; }
+    main { padding: 16px; }
+    .top { flex-wrap: wrap; }
+    .top .search { margin-left: 0; flex: 1 1 160px; min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side" aria-label="Main">
+    <div class="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></span>Work helper</div>
+    <button class="nav active" type="button" data-view="today" aria-current="page">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/><path d="m9.5 16 1.7 1.7 3.3-3.4"/></svg>
+      Today <span class="count" id="n-today"></span>
+    </button>
+    <button class="nav" type="button" data-view="tasks">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8.5 12 2.5 2.5 5-5"/></svg>
+      Tasks <span class="count" id="n-tasks"></span>
+    </button>
+    <button class="nav" type="button" data-view="epics">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12.5 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+      Epics <span class="count" id="n-epics"></span>
+    </button>
+    <button class="nav" type="button" data-view="changes">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5l3 2"/><circle cx="12" cy="13" r="8"/><path d="M5 3 2 6M19 3l3 3"/></svg>
+      Changes <span class="count" id="n-changes"></span>
+    </button>
+    <button class="nav" type="button" data-view="blockers">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      Blockers <span class="count" id="n-blockers"></span>
+    </button>
+    <button class="nav" type="button" data-view="ask">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.2L4 21l1.8-5.4A8 8 0 1 1 21 12Z"/><path d="M9 12h.01M12 12h.01M15 12h.01"/></svg>
+      Ask
+    </button>
+    <h2>Integrations <button type="button" id="sync-all">Sync all</button></h2>
+    <ul class="sync" id="sync"></ul>
+    <div class="foot" id="foot"></div>
+  </nav>
+
+  <main>
+    <div class="top">
+      <h1 id="title">Today</h1>
+      <span class="sub" id="sub"></span>
+      <span class="meta" id="meta"></span>
+      <label class="search">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="filter" type="search" placeholder="Filter" aria-label="Filter tasks and epics">
+      </label>
+      <button class="btn icon" id="refresh" type="button" aria-label="Refresh" title="Refresh">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+      </button>
+    </div>
+
+    <section id="view-tasks" aria-labelledby="title">
+      <form class="card add" id="add">
+        <input id="add-text" placeholder="Add a task…" aria-label="New task" autocomplete="off" required>
+        <select id="add-epic" aria-label="Task list"><option value="">My tasks</option></select>
+        <button class="btn primary" type="submit"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+      </form>
+      <div class="card" id="open"></div>
+      <details class="card done-wrap" id="done-wrap">
+        <summary><svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>Done <span id="n-done"></span></summary>
+        <div id="done"></div>
+      </details>
+    </section>
+
+    <section id="view-epics" hidden>
+      <div class="card" id="epics"></div>
+    </section>
+    <section id="view-feed" hidden>
+      <div class="card" id="feed"></div>
+    </section>
+    <section id="view-ask" hidden>
+      <div id="ask"></div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toast-text"></span><button type="button" id="toast-undo">Undo</button></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NAMES = { slack: "Slack", jira: "Jira", gitlab: "GitLab", notes: "Notes" };
+let data = null, lastJson = "";
+const VIEWS = ["today", "tasks", "epics", "changes", "blockers", "ask"];
+let prevSeenDay = ""; // last day the app was opened before today; entries after it are "new"
+try { prevSeenDay = localStorage.getItem("seen-day") || ""; } catch {}
+let view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
+let editing = null; // "epic|text" of the task whose description is being edited (slugs never contain "|")
+const keyOf = (t) => t.epic + "|" + t.text;
+const CAL_ADD = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M12 14v4M10 16h4"/></svg>`;
+const CAL_ON = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/><path d="m9.5 16 1.7 1.7 3.3-3.4"/></svg>`;
+const niceDay = (iso) => new Date(iso + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+
+function rel(iso) {
+  const min = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  if (min < 48 * 60) return `${Math.round(min / 60)} h ago`;
+  return `${Math.round(min / 1440)} d ago`;
+}
+
+function spark(counts, weeks) {
+  const top = Math.max(1, ...counts), w = 116, h = 28, bw = 7, gap = 2.9;
+  const bars = counts.map((c, i) => {
+    const bh = c ? Math.max(3, Math.round((c / top) * (h - 2))) : 2;
+    return `<rect class="${c ? "" : "zero"}" x="${(i * (bw + gap)).toFixed(1)}" y="${h - bh}" width="${bw}" height="${bh}" rx="2"><title>Week of ${weeks[i]}: ${c} item${c === 1 ? "" : "s"}</title></rect>`;
+  }).join("");
+  const total = counts.reduce((a, b) => a + b, 0);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="${total} items over the last ${counts.length} weeks">${bars}</svg>`;
+}
+
+function taskRow(t, chip) {
+  const key = keyOf(t), today = data.today;
+  const overdue = t.due && t.due < today && !t.done;
+  const dueLabel = !t.due ? "" : t.due === today ? "Today" : overdue ? `Overdue · ${niceDay(t.due)}` : niceDay(t.due);
+  const onToday = t.due === today;
+  const body = editing === key ? `
+      <form class="edit" data-key="${esc(key)}">
+        <div class="title">${esc(t.text)}</div>
+        <textarea placeholder="Description…" aria-label="Description for ${esc(t.text)}">${esc(t.description)}</textarea>
+        <div class="edit-actions"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-cancel>Cancel</button><span class="hint">⌘↩ save · Esc cancel</span></div>
+      </form>`
+    : `<button type="button" class="text" data-edit="${esc(key)}" title="Edit description">${esc(t.text)}</button>
+      ${t.description ? `<div class="desc">${esc(t.description)}</div>` : ""}`;
+  const tags = (dueLabel ? `<span class="due${overdue ? " overdue" : t.due > today ? " later" : ""}">${dueLabel}</span>` : "") + (chip ? `<span class="chip">${esc(t.epic_title)}</span>` : "");
+  return `<div class="task${t.done ? " done" : ""}">
+    <label class="tick"><input type="checkbox" data-epic="${esc(t.epic)}" data-text="${esc(t.text)}"${t.done ? " checked" : ""}><span class="sr">Done: ${esc(t.text)}</span></label>
+    <div class="tbody">${body}${tags ? `<div class="tags">${tags}</div>` : ""}</div>
+    <button type="button" class="mini${onToday ? " on" : ""}" data-today="${esc(key)}" aria-label="${onToday ? "Remove from today" : "Add to today"}" title="${onToday ? "Remove from today" : "Add to today"}">${onToday ? CAL_ON : CAL_ADD}</button>
+  </div>`;
+}
+
+// ---- integrations: last sync + on-demand sync
+const syncing = new Set();
+const REFRESH_ICON = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>`;
+function renderSync() {
+  if (!data) return;
+  const all = syncing.has("all");
+  $("sync-all").disabled = syncing.size > 0;
+  $("sync-all").textContent = all ? "Syncing…" : "Sync all";
+  $("sync").innerHTML = Object.entries(data.sync).map(([k, s]) => {
+    const busy = all || syncing.has(k);
+    const age = s.synced ? (Date.now() - new Date(s.synced)) / 3600000 : Infinity;
+    const cls = !s.synced ? "never" : age > 24 ? "stale" : "ok";
+    const when = busy ? "syncing…" : !s.synced ? "never synced" : `${rel(s.synced)}${cls === "stale" ? " · stale" : ""}`;
+    return `<li class="${cls}"><span class="dot" aria-hidden="true"></span><span>${NAMES[k] || k}</span>
+      <button type="button" class="mini${busy ? " spin" : ""}" data-sync="${k}" aria-label="Sync ${NAMES[k] || k}" title="Sync ${NAMES[k] || k}"${syncing.size ? " disabled" : ""}>${REFRESH_ICON}</button>
+      <span class="when">${when} · ${s.items} item${s.items === 1 ? "" : "s"}</span></li>`;
+  }).join("");
+}
+async function runSync(source) {
+  if (syncing.size) return;
+  syncing.add(source);
+  renderSync();
+  let res;
+  try {
+    const r = await fetch("/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source }) });
+    res = await r.json();
+  } catch { res = { error: "Cannot reach the dashboard server." }; }
+  syncing.delete(source);
+  if (res.results) {
+    const parts = Object.entries(res.results).map(([k, v]) => `${NAMES[k] || k}: ${v}`);
+    if ("indexed" in res) parts.push(`indexed ${res.indexed} item${res.indexed === 1 ? "" : "s"}`);
+    if (res.index_error) parts.push(res.index_error);
+    toast(parts.join(" · "), null);
+  } else {
+    toast(res.error || "Sync failed.", null);
+  }
+  lastJson = "";
+  await load();
+  renderSync();
+}
+$("sync-all").addEventListener("click", () => runSync("all"));
+$("sync").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sync]"); if (b) runSync(b.dataset.sync); });
+
+// ---- activity feed: Changes (by day) and Blockers & questions (by epic)
+function eventRow(ev, showEpic) {
+  const isNew = prevSeenDay && ev.date > prevSeenDay;
+  const link = ev.url ? ` <a href="${esc(ev.url)}" target="_blank" rel="noopener">${esc(ev.source)} link</a>` : "";
+  return `<div class="ev${isNew ? " new" : ""}">
+    <span class="kind ${esc(ev.kind)}">${esc(ev.kind || ev.source)}</span>
+    <div><div class="evhead">${showEpic ? `<b>${esc(ev.epic.title)}</b>` : `<b>${niceDay(ev.date)}</b>`}<span>${esc(ev.source)} · ${esc(ev.title)}</span>${link}</div>
+    <div class="evsum">${esc(ev.summary)}</div></div>
+  </div>`;
+}
+function renderFeed(allEvents, q) {
+  const match = (ev) => !q || [ev.summary, ev.title, ev.epic.title, ev.kind].some((x) => x.toLowerCase().includes(q));
+  if (view === "changes") {
+    const events = allEvents.filter(match).sort((a, b) => b.date.localeCompare(a.date));
+    const fresh = events.filter((ev) => prevSeenDay && ev.date > prevSeenDay).length;
+    $("meta").textContent = `${events.length} entries${prevSeenDay ? ` · ${fresh} new` : ""}`;
+    const days = new Map();
+    events.forEach((ev) => { if (!days.has(ev.date)) days.set(ev.date, []); days.get(ev.date).push(ev); });
+    $("feed").innerHTML = days.size ? [...days].map(([day, items]) => `
+      <div class="day">${niceDay(day)}${day === data.today ? " · today" : ""}${prevSeenDay && day > prevSeenDay ? `<span class="pill">new</span>` : ""}<span class="n">${items.length}</span></div>
+      ${items.map((ev) => eventRow(ev, true)).join("")}`).join("")
+      : `<div class="empty"><strong>${q ? "No matching changes" : "No activity yet"}</strong>${q ? "Try another filter." : "Run <code>work-helper sync</code> to collect and index your sources."}</div>`;
+  } else {
+    const events = allEvents.filter((ev) => (ev.kind === "blocker" || ev.kind === "question") && match(ev));
+    $("meta").textContent = `${events.filter((e) => e.kind === "blocker").length} blockers · ${events.filter((e) => e.kind === "question").length} questions`;
+    const groups = new Map();
+    events.forEach((ev) => { if (!groups.has(ev.epic.slug)) groups.set(ev.epic.slug, { epic: ev.epic, items: [] }); groups.get(ev.epic.slug).items.push(ev); });
+    $("feed").innerHTML = groups.size ? [...groups.values()].map((g) => `
+      <div class="egroup"><h3>${esc(g.epic.title)}<span class="n">${g.items.length}</span><span class="badge ${g.epic.status}">${g.epic.status}</span></h3>
+      ${g.items.map((ev) => eventRow(ev, false)).join("")}</div>`).join("")
+      : `<div class="empty"><strong>${q ? "No matching blockers or questions" : "No open blockers or questions"}</strong>${q ? "Try another filter." : "The indexer tags log entries as blocker or question; they show up here."}</div>`;
+  }
+}
+
+// ---- epic detail pane
+let selected = null;
+function renderDetail() {
+  const pane = $("detail");
+  if (!pane) return;
+  const e = data.epics.find((x) => x.slug === selected);
+  document.querySelectorAll(".epic").forEach((d) => d.classList.toggle("selected", d.dataset.slug === selected));
+  if (!e) { pane.innerHTML = `<div class="empty"><strong>No epic selected</strong>Click an epic on the left.</div>`; return; }
+  pane.innerHTML = `
+    <div class="detail-head"><h2>${esc(e.title)}</h2><span class="badge ${e.status}">${e.status}</span><span class="path">epics/${esc(e.slug)}.md · ${e.entries} entries · last activity ${e.last || "—"}</span></div>
+    <div class="detail-body">
+      <h3>State</h3><div class="state">${e.state ? md(e.state) : "<p><em>No state summary yet. It is written after the next index run.</em></p>"}</div>
+      <h3>Timeline</h3><div class="log">${e.log ? md(e.log) : "<p><em>No log entries.</em></p>"}</div>
+    </div>`;
+}
+document.addEventListener("toggle", (ev) => {
+  if (ev.target.matches?.(".epic") && ev.target.open && ev.target.dataset.slug !== selected) { selected = ev.target.dataset.slug; renderDetail(); }
+}, true);
+
+// ---- chat with Codex about one epic
+const chats = {}; // slug -> { thread, messages: [{ role, text, error }], busy }
+const chatOf = (slug) => chats[slug] || (chats[slug] = { thread: "", messages: [], busy: false });
+let chatHidden = false;
+try { chatHidden = localStorage.getItem("chat-hidden") === "1"; } catch {}
+
+function md(s) { // tiny Markdown: paragraphs, headings, bullet lists, bold, code, links
+  const inline = (t) => esc(t)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return s.trim().split(/\n{2,}/).map((block) => {
+    const lines = block.split("\n");
+    if (lines.every((l) => /^\s*[-*] /.test(l))) return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^\s*[-*] /, ""))}</li>`).join("")}</ul>`;
+    const parts = []; let para = [];
+    const flush = () => { if (para.length) { parts.push(`<p>${para.map(inline).join("<br>")}</p>`); para = []; } };
+    lines.forEach((l) => { const h = /^#{1,6} (.*)/.exec(l); if (h) { flush(); parts.push(`<h4>${inline(h[1])}</h4>`); } else para.push(l); });
+    flush();
+    return parts.join("");
+  }).join("");
+}
+
+function chatPanel(e, always = false) {
+  const c = chatOf(e.slug);
+  const head = `<div class="chat-head">${always ? "Ask Codex about all your work" : "Ask Codex about this epic"}${always ? "" : `<button type="button" class="chat-toggle">${chatHidden ? "Show chat" : "Hide chat"}</button>`}</div>`;
+  if (chatHidden && !always) return `<div class="chat" data-slug="${esc(e.slug)}">${head}</div>`;
+  const log = c.messages.map((m) => m.role === "user"
+    ? `<div class="msg user">${esc(m.text)}</div>`
+    : `<div class="msg bot${m.error ? " err" : ""}">${m.error ? esc(m.text) : md(m.text)}</div>`).join("")
+    + (c.busy ? `<div class="msg bot busy">Codex is working… this can take a minute.</div>` : "");
+  const hint = c.messages.length ? "" : `<div class="chat-hint">${always
+    ? "Ask across every epic: what is blocked, what changed this week, who is waiting on whom. Codex reads the notes and raw items, and can edit a note when you ask it to."
+    : "Ask what is going on or what is left, or say how to refine the State and TODOs. Codex reads the note and the raw items, and edits the note when you ask it to."}</div>`;
+  return `<div class="chat" data-slug="${esc(e.slug)}">${head}${hint}<div class="chat-log">${log}</div>
+    <form class="chat-form"><textarea rows="1" placeholder="Message about ${esc(e.title)}…" aria-label="Message to Codex about ${esc(e.title)}"${c.busy ? " disabled" : ""}></textarea><button class="btn primary" type="submit"${c.busy ? " disabled" : ""}>Send</button></form></div>`;
+}
+
+document.addEventListener("submit", async (ev) => {
+  const form = ev.target.closest(".chat-form");
+  if (!form) return;
+  ev.preventDefault();
+  const slug = form.closest(".chat").dataset.slug, text = form.querySelector("textarea").value.trim();
+  if (!text) return;
+  const c = chatOf(slug);
+  c.messages.push({ role: "user", text });
+  c.busy = true;
+  render();
+  let res;
+  try {
+    const r = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ epic: slug, text, thread: c.thread }) });
+    res = await r.json();
+  } catch { res = { error: "Cannot reach the dashboard server." }; }
+  c.busy = false;
+  if (res.thread) c.thread = res.thread;
+  c.messages.push(res.reply ? { role: "bot", text: res.reply } : { role: "bot", text: res.error || "No reply.", error: true });
+  lastJson = ""; // Codex may have edited the note
+  await load();
+  render();
+  document.querySelector(`.chat[data-slug="${slug}"] textarea`)?.focus();
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter" && !ev.shiftKey && ev.target.matches(".chat-form textarea")) { ev.preventDefault(); ev.target.form.requestSubmit(); }
+});
+document.addEventListener("click", (ev) => {
+  if (!ev.target.matches(".chat-toggle")) return;
+  chatHidden = !chatHidden;
+  try { localStorage.setItem("chat-hidden", chatHidden ? "1" : "0"); } catch {}
+  render();
+});
+
+function setView(v) {
+  view = v;
+  history.replaceState(null, "", "#" + v);
+  document.querySelectorAll(".nav").forEach((b) => {
+    const on = b.dataset.view === v;
+    b.classList.toggle("active", on);
+    if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+  $("view-tasks").hidden = !(v === "today" || v === "tasks");
+  $("view-epics").hidden = v !== "epics";
+  $("view-feed").hidden = !(v === "changes" || v === "blockers");
+  $("view-ask").hidden = v !== "ask";
+  $("title").textContent = { today: "Today", tasks: "Tasks", epics: "Epics", changes: "Changes", blockers: "Blockers & questions", ask: "Ask" }[v];
+  $("sub").textContent = v === "today" ? new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })
+    : v === "changes" && prevSeenDay ? `new since ${niceDay(prevSeenDay)}` : "";
+  $("filter").placeholder = { epics: "Filter epics", changes: "Filter changes", blockers: "Filter blockers", ask: "Filter" }[v] || "Filter tasks";
+  $("filter").parentElement.hidden = v === "ask";
+  render();
+}
+
+function render() {
+  if (!data) return;
+  const q = $("filter").value.trim().toLowerCase();
+  const openAll = data.tasks.filter((t) => !t.done);
+  $("n-tasks").textContent = openAll.length;
+  $("n-today").textContent = openAll.filter((t) => t.due && t.due <= data.today).length;
+  if (prevSeenDay !== data.today) { try { localStorage.setItem("seen-day", data.today); } catch {} }
+  if (prevSeenDay === data.today) prevSeenDay = ""; // opened earlier today: nothing is "new since" a previous day
+  const allEvents = data.epics.flatMap((e) => e.events.map((ev) => ({ ...ev, epic: e })));
+  $("n-changes").textContent = prevSeenDay ? allEvents.filter((ev) => ev.date > prevSeenDay).length : "";
+  $("n-blockers").textContent = allEvents.filter((ev) => ev.kind === "blocker" || ev.kind === "question").length;
+  $("n-epics").textContent = data.epics.length;
+  $("foot").textContent = data.vault;
+
+  renderSync();
+
+  if (view === "ask") {
+    $("meta").textContent = "Codex answers from all epics, notes and raw items";
+    $("ask").innerHTML = chatPanel({ slug: "", title: "your work" }, true);
+  } else if (view === "changes" || view === "blockers") {
+    renderFeed(allEvents, q);
+  } else if (view === "today" || view === "tasks") {
+    const todayView = view === "today";
+    let tasks = data.tasks.filter((t) => !q || t.text.toLowerCase().includes(q) || t.epic_title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q));
+    if (todayView) tasks = tasks.filter((t) => t.due && t.due <= data.today);
+    const open = tasks.filter((t) => !t.done), done = tasks.filter((t) => t.done);
+    $("meta").textContent = `${open.length} open · ${done.length} done`;
+    if (todayView) open.sort((a, b) => a.due.localeCompare(b.due)); // overdue first
+    const groups = new Map();
+    open.forEach((t) => { if (!groups.has(t.epic)) groups.set(t.epic, { title: t.epic_title, items: [] }); groups.get(t.epic).items.push(t); });
+    $("add-text").placeholder = todayView ? "Add a task for today…" : "Add a task…";
+    $("open").innerHTML = groups.size
+      ? [...groups.values()].map((g) => `<div class="group"><h3>${esc(g.title)} <span class="n">${g.items.length}</span></h3>${g.items.map((t) => taskRow(t, false)).join("")}</div>`).join("")
+      : todayView
+        ? `<div class="empty"><strong>${q ? "No matching tasks for today" : "Nothing planned for today"}</strong>${q ? "Try another filter." : "Type a task above, or pick some in Tasks with the calendar button."}</div>`
+        : `<div class="empty"><strong>${q ? "No matching open tasks" : "All clear"}</strong>${q ? "Try another filter." : "Add a task above, or run <code>work-helper sync</code> to pull new ones."}</div>`;
+    $("n-done").textContent = done.length;
+    $("done-wrap").hidden = !done.length;
+    $("done").innerHTML = done.map((t) => taskRow(t, true)).join("");
+  } else {
+    const wasOpen = new Set([...document.querySelectorAll(".epic[open]")].map((d) => d.dataset.slug));
+    const epics = data.epics.filter((e) => !q || e.slug.includes(q) || e.title.toLowerCase().includes(q));
+    const active = data.epics.filter((e) => e.status === "active" || e.status === "new").length;
+    $("meta").textContent = `${epics.length} epic${epics.length === 1 ? "" : "s"} · ${active} active`;
+    if (!epics.some((e) => e.slug === selected)) selected = epics[0]?.slug || null;
+    $("epics").innerHTML = epics.length ? `<div class="epics-layout"><div class="card">` +
+      epics.map((e) => {
+        const mine = data.tasks.filter((t) => t.epic === e.slug), open = mine.filter((t) => !t.done);
+        return `<details class="epic${e.slug === selected ? " selected" : ""}" data-slug="${esc(e.slug)}"${wasOpen.has(e.slug) ? " open" : ""}>
+          <summary>
+            <div class="crow"><span class="name">${esc(e.title)}</span><span class="badge ${e.status}">${e.status}</span>${spark(e.counts, data.weeks)}</div>
+            <div class="cmeta"><span>${e.entries} entries</span><span>since ${e.since || "—"}</span><span>last ${e.last || "—"}</span><span><b>${open.length}</b>/${mine.length} open</span>${e.blockers ? `<span><b class="alert">${e.blockers}</b> blocker${e.blockers === 1 ? "" : "s"}</span>` : ""}</div>
+          </summary>
+          <div class="ebody">
+            ${open.length ? `<h4>Open tasks</h4>${open.map((t) => taskRow(t, false)).join("")}` : ""}
+            <div class="meta"><span>${mine.length - open.length} done</span><span>Note: epics/${esc(e.slug)}.md</span></div>
+            ${chatPanel(e)}
+          </div>
+        </details>`;
+      }).join("") + `</div><div class="card detail" id="detail"></div></div>`
+      : `<div class="empty"><strong>${q ? "No matching epics" : "No epics yet"}</strong>${q ? "Try another filter." : "Run <code>work-helper sync</code> to collect and index your sources."}</div>`;
+    renderDetail();
+  }
+
+  document.querySelectorAll(".chat-log").forEach((el) => { el.scrollTop = el.scrollHeight; });
+
+  const sel = $("add-epic"), keep = sel.value;
+  sel.innerHTML = `<option value="">My tasks</option>` + data.epics.map((e) => `<option value="${esc(e.slug)}">${esc(e.title)}</option>`).join("");
+  sel.value = [...sel.options].some((o) => o.value === keep) ? keep : "";
+}
+
+async function post(path, body) {
+  try {
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function load() {
+  let text;
+  try {
+    text = await (await fetch("/api")).text();
+  } catch {
+    $("meta").textContent = "Cannot reach the dashboard server. Is it still running?";
+    return;
+  }
+  if (text === lastJson) return; // nothing changed: keep the DOM as it is
+  lastJson = text;
+  data = JSON.parse(text);
+  render(); // a render bug should surface in the console, not as a connection error
+}
+
+let toastTimer, undoFn = null;
+function toast(text, undo) {
+  clearTimeout(toastTimer);
+  undoFn = undo;
+  $("toast-text").textContent = text;
+  $("toast-undo").hidden = !undo;
+  $("toast").hidden = false;
+  toastTimer = setTimeout(() => { $("toast").hidden = true; }, 6000);
+}
+$("toast-undo").addEventListener("click", async () => { $("toast").hidden = true; if (undoFn) await undoFn(); });
+
+document.addEventListener("change", async (ev) => {
+  const box = ev.target;
+  if (box.type !== "checkbox" || box.dataset.text === undefined) return;
+  const { epic, text } = box.dataset, nowDone = box.checked;
+  box.disabled = true;
+  if (!(await post("/task", { epic, text, done: nowDone }))) {
+    box.checked = !nowDone; box.disabled = false;
+    toast("Could not update the note. Check the server output.", null);
+    return;
+  }
+  lastJson = "";
+  await load();
+  if (nowDone) toast(`Done: ${text}`, async () => { await post("/task", { epic, text, done: false }); lastJson = ""; await load(); });
+});
+
+$("add").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const input = $("add-text"), text = input.value.trim(), epic = $("add-epic").value;
+  if (!text) return;
+  input.disabled = true;
+  const ok = await post("/tasks", { epic, text, due: view === "today" ? data.today : "" });
+  input.disabled = false;
+  if (!ok) { toast("Could not add the task. Does that epic note still exist?", null); return; }
+  input.value = "";
+  input.focus();
+  await load();
+});
+
+const findTask = (key) => data.tasks.find((t) => keyOf(t) === key);
+document.addEventListener("click", async (ev) => {
+  const edit = ev.target.closest("[data-edit]"), cancel = ev.target.closest("[data-cancel]"), today = ev.target.closest("[data-today]");
+  if (edit) { editing = edit.dataset.edit; render(); document.querySelector(".edit textarea")?.focus(); }
+  else if (cancel) { editing = null; render(); }
+  else if (today) {
+    const t = findTask(today.dataset.today);
+    if (!t) return;
+    today.disabled = true;
+    const ok = await post("/task", { epic: t.epic, text: t.text, due: t.due === data.today ? "" : data.today });
+    if (!ok) toast("Could not update the task.", null);
+    lastJson = ""; await load();
+  }
+});
+document.addEventListener("submit", async (ev) => {
+  const form = ev.target.closest(".edit");
+  if (!form) return;
+  ev.preventDefault();
+  const t = findTask(form.dataset.key);
+  if (!t) return;
+  const ok = await post("/task", { epic: t.epic, text: t.text, description: form.querySelector("textarea").value });
+  if (!ok) { toast("Could not save the description.", null); return; }
+  editing = null;
+  lastJson = ""; await load(); render();
+});
+document.addEventListener("keydown", (ev) => {
+  if (!ev.target.matches(".edit textarea")) return;
+  if (ev.key === "Escape") { editing = null; render(); }
+  if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); ev.target.form.requestSubmit(); }
+});
+document.querySelectorAll(".nav").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+window.addEventListener("hashchange", () => setView(VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today"));
+$("filter").addEventListener("input", render);
+$("refresh").addEventListener("click", load);
+window.addEventListener("focus", load);
+setInterval(load, 60000);
+setView(view);
+load();
+</script>
+</body>
+</html>
