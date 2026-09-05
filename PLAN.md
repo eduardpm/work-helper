@@ -46,8 +46,10 @@ vault/
 ```
 
 Epic notes carry YAML frontmatter (`tags`, `people`, `refs`, `updated`) and a
-fixed body: `# Title`, `## State` (LLM-maintained catch-up summary), `## TODO`
-(checkboxes, ticks survive re-index), `## Log` (newest first, one entry per
+fixed body: `# Title`, `## State` (LLM-maintained catch-up summary with three
+`###` sections: Summary, Where it stands, Blockers and questions), `## TODO`
+(the user's checkboxes with `📅` due dates and indented descriptions; the indexer
+only preserves them, it never adds tasks), `## Log` (newest first, one entry per
 item, tagged with an event kind: decision, blocker, discovery, question,
 progress). The frontmatter makes ripgrep and Obsidian search precise.
 
@@ -73,10 +75,9 @@ For each unprocessed raw item:
 
 1. Read the list of existing epic slugs from `vault/epics/`.
 2. Send the item plus that list to LM Studio. Ask for JSON only:
-   1-3 epic slugs (existing or new), event kind, tags, people, summary,
-   todos, refs.
+   1-3 epic slugs (existing or new), event kind, tags, people, summary, refs.
 3. Python renders the Markdown, not the model. The script merges the result
-   into each epic note (log entry + new TODO checkboxes) and the daily note.
+   into each epic note (log entry) and the daily note.
 4. Mark the item processed in `.state.json`.
 
 After the loop, for every epic that got new entries, a second LLM call rewrites

@@ -21,7 +21,7 @@ def test_payload_epics_tasks_and_sync(tmp_path):
     assert by["checkout-redesign"]["status"] == "active"
     assert sum(by["stock-depletion"]["counts"]) == 8 and by["stock-depletion"]["counts"][-1] == 2
     assert "todos" not in by["stock-depletion"]  # moved into tasks
-    assert by["stock-depletion"]["log"].count("### ") == 8 and by["stock-depletion"]["state"].startswith("Stock depletion is")
+    assert by["stock-depletion"]["log"].count("### ") == 8 and by["stock-depletion"]["state"].startswith("### Summary")
     events = by["stock-depletion"]["events"]
     assert len(events) == 8 and events[0]["date"] == "2026-09-05" and events[-1]["date"] == "2026-06-23"
     assert events[2] == {"date": "2026-08-27", "source": "slack", "title": "#inventory", "url": "https://slack.example/14",
@@ -204,7 +204,7 @@ def test_update_task_due_and_description(tmp_path):
     assert f"- [x] {task}\n- [ ] review !482" in note.read_text()
     assert not update_task(tmp_path, "stock-depletion", task, {"due": "next week"})
     assert not update_task(tmp_path, "stock-depletion", "no such task", {"done": True})
-    # the indexer still recognises the task as existing and does not duplicate it
+    # a re-index keeps planned tasks exactly as they are
     from test_render import make_index, make_item
 
     from work_helper.indexer.render import parse_epic, update_epic
@@ -213,3 +213,17 @@ def test_update_task_due_and_description(tmp_path):
     update_epic(tmp_path, make_item("z-1"), make_index(["Write ADR for depletion events"], epics=("stock-depletion",)), "stock-depletion")
     todos = parse_epic(note.read_text())[3]
     assert sum("write ADR" in t for t in todos) == 1 and any("📅 2026-09-09\n    Cover the cancel path" in t for t in todos)
+
+
+def test_favorite_lives_in_frontmatter(tmp_path):
+    from work_helper.dashboard import set_favorite
+    from work_helper.indexer.render import parse_epic
+
+    seed_demo(tmp_path, TODAY)
+    by = {e["slug"]: e for e in payload(tmp_path, TODAY)["epics"]}
+    assert by["stock-depletion"]["favorite"] is True and by["ci-flakes"]["favorite"] is False
+    assert set_favorite(tmp_path, "ci-flakes", True)
+    assert parse_epic((tmp_path / "epics/ci-flakes.md").read_text())[0]["favorite"] is True
+    assert set_favorite(tmp_path, "ci-flakes", False)
+    assert "favorite" not in parse_epic((tmp_path / "epics/ci-flakes.md").read_text())[0]
+    assert not set_favorite(tmp_path, "nope", True)

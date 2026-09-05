@@ -22,7 +22,6 @@ Respond with ONE JSON object and nothing else:
   "tags": ["lowercase", "keywords"],
   "people": ["names mentioned or involved"],
   "summary": "1-3 short sentences: what happened in this item, with names",
-  "todos": ["open action items stated or clearly implied, empty list if none"],
   "refs": ["ticket keys like PROJ-123 or MR numbers like !45 mentioned in the item"]
 }}
 
@@ -32,7 +31,6 @@ Rules:
 - Ticket keys and MR numbers are the strongest signal that items share an epic.
 - event: what kind of development this item is, one of {kinds} —
   or "" if none clearly fits.
-- todos: only real open work, not things already done.
 - Keep tags generic and reusable (e.g. "renovate", "ci", "deployment").
 """.format(kinds=", ".join(f'"{k}"' for k in EVENT_KINDS))
 
@@ -40,13 +38,22 @@ STATE_PROMPT = """You maintain the "State" section of an epic note in a personal
 work knowledge base. The reader wants to catch up on this epic without reading
 every message, ticket, and PR behind it.
 
-Write 3-8 short sentences of plain Markdown (no headings, no lists required):
-- what this epic is about, in plain words
-- where it stands right now
-- open blockers, disagreements, or unanswered questions, with names
+Write Markdown with exactly these three headings, in this order:
 
-Prefer newer log entries over older ones when they conflict. Do not repeat the
-log entry by entry. Respond with the State text only."""
+### Summary
+2-4 sentences: what this epic is about, in plain words, and why it matters.
+
+### Where it stands
+Bullet list, newest developments first: what was decided, built, merged or
+agreed, with names and ticket or MR keys when the log has them.
+
+### Blockers and questions
+Bullet list of open blockers, disagreements or unanswered questions, each with
+who is waiting on whom. Write "- none known" if there are none.
+
+Rules: use "###" headings only, one blank line between blocks, short bullets,
+prefer newer log entries when they conflict, do not repeat the log entry by
+entry, do not invent anything. Respond with the State text only."""
 
 
 class ItemIndex(BaseModel):

@@ -43,15 +43,18 @@ def test_create_and_update_epic(tmp_path):
     assert state == ""  # placeholder parses back as empty
     assert meta["tags"] == ["renovate"]
     assert meta["refs"] == ["PROJ-123"]
-    assert todos == ["- [ ] decide schedule"]
+    assert todos == ["- [ ] (nothing tracked yet)"]  # the indexer never creates tasks
     assert "slack link" in log
     assert "**question**" in log
 
-    # second item: duplicate todo must not double, new todo must appear
+    # the user's tasks survive the next item, and the LLM's suggestions are still ignored
+    from work_helper.dashboard import add_task
+
+    add_task(tmp_path, "renovate-config", "decide schedule", due="2026-09-05", description="Ask Anna.")
     item2 = make_item("slack-C1-2.0")
     update_epic(tmp_path, item2, make_index(["Decide schedule", "update config MR"]), "renovate-config")
     _, _, _, todos, log = parse_epic(path.read_text())
-    assert todos == ["- [ ] decide schedule", "- [ ] update config MR"]
+    assert todos == ["- [ ] decide schedule 📅 2026-09-05\n    Ask Anna."]
     assert log.count("### 2026-08-31") == 2
 
 
@@ -66,8 +69,11 @@ def test_state_survives_update(tmp_path):
 
 
 def test_checked_todo_survives_update(tmp_path):
+    from work_helper.dashboard import add_task
+
     item = make_item()
-    path = update_epic(tmp_path, item, make_index(["decide schedule"]), "renovate-config")
+    path = update_epic(tmp_path, item, make_index([]), "renovate-config")
+    add_task(tmp_path, "renovate-config", "decide schedule")
     # user ticks the box in Obsidian
     path.write_text(path.read_text().replace("- [ ] decide schedule", "- [x] decide schedule"))
 

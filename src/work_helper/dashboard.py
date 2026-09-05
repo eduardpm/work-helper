@@ -51,11 +51,13 @@ of Markdown notes, which is the current working directory.
 
 EDIT_RULES = """When the user asks to REFINE a note (rewrite the State, add, remove or reword
 TODOs, fix tags, people, refs or the title), edit it in place and keep the
-structure above. The State is 3-8 plain sentences: what the epic is about, where
-it stands, open blockers or questions with names; prefer newer log entries when
-they conflict. Never tick or untick TODO boxes or change their dates. Do not edit
-files the user did not ask about. Then reply with a short summary of what you
-changed.
+structure above. The State has exactly three "###" sections: "Summary" (2-4
+sentences), "Where it stands" (bullets, newest first, with names and ticket or MR
+keys) and "Blockers and questions" (bullets with who waits on whom, or "- none
+known"). Prefer newer log entries when they conflict. Never tick or untick TODO
+boxes or change their dates; only add or reword TODOs when the user asks. Do not
+edit files the user did not ask about. Then reply with a short summary of what
+you changed.
 
 Reply in plain Markdown, briefly. This is a chat: later messages continue it.
 """
@@ -129,7 +131,7 @@ def _events(log: str) -> list[dict]:
 
 
 def _epic(path: Path, today: date) -> dict:
-    _meta, title, state, todos, log = parse_epic(path.read_text())
+    meta, title, state, todos, log = parse_epic(path.read_text())
     dates = sorted(date.fromisoformat(d) for d in LOG_ENTRY.findall(log))
     counts = [0] * WEEKS
     for d in dates:
@@ -147,6 +149,7 @@ def _epic(path: Path, today: date) -> dict:
     return {
         "slug": path.stem,
         "title": title,
+        "favorite": bool(meta.get("favorite")),
         "state": state,
         "log": log,
         "events": _events(log),
@@ -227,6 +230,20 @@ def update_task(vault: Path, slug: str, text: str, patch: dict) -> bool:
         indent=indent,
     ).split("\n")
     path.write_text("\n".join(lines))
+    return True
+
+
+def set_favorite(vault: Path, slug: str, favorite: bool) -> bool:
+    """Store the star in the epic's frontmatter, so Obsidian sees it too."""
+    path = _todo_file(vault, slug) if slug else None
+    if path is None or not path.exists():
+        return False
+    meta, title, state, todos, log = parse_epic(path.read_text())
+    if favorite:
+        meta["favorite"] = True
+    else:
+        meta.pop("favorite", None)
+    path.write_text(render_epic(meta, title, state, todos, log))
     return True
 
 
@@ -363,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, b"not found", "text/plain")
 
     def do_POST(self):
-        if self.path not in ("/task", "/tasks", "/chat", "/sync"):
+        if self.path not in ("/task", "/tasks", "/chat", "/sync", "/epic"):
             return self._send(404, b"not found", "text/plain")
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)) or b"{}"))
@@ -376,6 +393,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/sync":
             res = sync(self.cfg, str(body.get("source", "all")))
             return self._json(200 if "results" in res else 400, res)
+        if self.path == "/epic":
+            ok = set_favorite(self.vault, epic, bool(body.get("favorite")))
+            return self._json(200 if ok else 400, {"ok": ok})
         if self.path == "/tasks":  # create
             ok = add_task(self.vault, epic, text, str(body.get("due") or ""), str(body.get("description") or ""))
         else:  # edit: done / due / description

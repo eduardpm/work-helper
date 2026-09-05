@@ -80,12 +80,6 @@ def _merge_list(existing, new_items) -> list[str]:
     return list(seen.values())
 
 
-def _todo_text(line: str) -> str:
-    """Comparable task title: first line, without checkbox, date marker, or description."""
-    head = line.split("\n", 1)[0].split("]", 1)[-1]
-    return DUE_MARK.sub("", head).strip().lower()
-
-
 def update_epic(vault: Path, item: RawItem, idx: ItemIndex, slug: str) -> Path:
     path = epic_path(vault, slug)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -101,10 +95,7 @@ def update_epic(vault: Path, item: RawItem, idx: ItemIndex, slug: str) -> Path:
     meta["refs"] = _merge_list(meta.get("refs"), idx.refs)
     meta["updated"] = iso()[:10]
 
-    existing_texts = {_todo_text(t) for t in todos}
-    for todo in idx.todos:
-        if todo.lower() not in existing_texts:
-            todos.append(f"- [ ] {todo}")
+    # TODOs belong to the user (dashboard, Obsidian); the indexer only preserves them.
 
     day = item.timestamp[:10]
     link = f" — [{item.source} link]({item.url})" if item.url else ""

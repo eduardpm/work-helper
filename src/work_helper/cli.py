@@ -20,7 +20,7 @@ def cmd_collect(cfg, args) -> int:
 def cmd_index(cfg, args) -> int:
     from .indexer import run_index
 
-    run_index(cfg)
+    run_index(cfg, restate=getattr(args, "restate", False))
     return 0
 
 
@@ -74,6 +74,7 @@ def main(argv=None) -> int:
     p_collect.set_defaults(func=cmd_collect)
 
     p_index = sub.add_parser("index", help="categorize raw items with LM Studio")
+    p_index.add_argument("--restate", action="store_true", help="rewrite the State section of every epic")
     p_index.set_defaults(func=cmd_index)
 
     p_sync = sub.add_parser("sync", help="collect all sources, then index")

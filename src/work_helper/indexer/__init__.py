@@ -18,7 +18,7 @@ def refresh_state(llm: LLM, vault: Path, slug: str) -> None:
         path.write_text(render_epic(meta, title, new_state, todos, log_body))
 
 
-def run_index(cfg: Config) -> int:
+def run_index(cfg: Config, restate: bool = False) -> int:
     state = State(cfg.vault)
     llm = LLM(cfg.lmstudio)
     epics = list_epics(cfg.vault)
@@ -45,7 +45,7 @@ def run_index(cfg: Config) -> int:
         count += 1
         print(f"  {item.id} -> {', '.join(idx.epics)}")
 
-    for slug in sorted(touched):
+    for slug in sorted(set(epics) if restate else touched):
         try:
             refresh_state(llm, cfg.vault, slug)
             print(f"  state refreshed: epics/{slug}.md")

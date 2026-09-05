@@ -13,22 +13,49 @@ from .indexer.render import parse_epic, render_epic, update_daily, update_epic
 from .state import State
 
 STATES = {
-    "stock-depletion": (
-        "Stock depletion is the new inventory concept: orders reserve stock at checkout "
-        "and the warehouse service depletes it on pick. Anna's team owns the events; we "
-        "consume them in pricing. Bela asked whether cancellations re-credit stock "
-        "synchronously; no answer yet. The consumer MR !482 is in review."
-    ),
-    "renovate-config": (
-        "Renovate keeps opening major-version MRs during release week. Csaba wants a "
-        "schedule outside release days; Dora prefers grouping majors. Blocked until the "
-        "team agrees on the schedule."
-    ),
-    "checkout-redesign": (
-        "New checkout flow behind a feature flag. Address form aligned with design last "
-        "week; payment step is next. Rollout to 5% of traffic planned once the flag exists."
-    ),
+    "stock-depletion": """### Summary
+Stock depletion is the new inventory concept: orders reserve stock at checkout and the warehouse service depletes it on pick. Anna's team owns the events; pricing consumes them, so this decides how our numbers react to reservations.
+
+### Where it stands
+- Consumer MR !482 (Anna) handles reserve and deplete events; in review, Anna wants eyes on it before Friday.
+- Decision: checkout reserves stock at order placement, not at cart (Anna, Dora).
+- INV-131 opened by Bela for the cancellation re-credit question.
+
+### Blockers and questions
+- Bela is waiting on Anna's team: do cancellations re-credit stock synchronously?
+- Anna is waiting on a reviewer for !482.""",
+    "renovate-config": """### Summary
+Renovate keeps opening major-version MRs during release week, which floods the platform team. The epic is about picking a schedule and grouping strategy.
+
+### Where it stands
+- Dora drafted a renovate.json with grouped majors (!490).
+- Csaba raised the blocker in #platform after 14 major MRs landed in release week again.
+
+### Blockers and questions
+- Csaba is waiting on the team to agree on a schedule outside release days; Dora prefers grouping majors instead.""",
+    "checkout-redesign": """### Summary
+New checkout flow behind a feature flag, starting with the address form and then the payment step.
+
+### Where it stands
+- Address form aligned with design; MR !455 approved (Dora).
+- Checkout reserves stock at order placement, shared decision with the stock depletion epic.
+
+### Blockers and questions
+- none known""",
 }
+
+# epic tasks the user planned (the indexer never creates tasks)
+TASKS = [
+    ("payments-migration", "cut over sandbox to new PSP"),
+    ("stock-depletion", "review depletion event schema"),
+    ("ci-flakes", "retry flaky job manually when it fails"),
+    ("checkout-redesign", "add feature flag for new checkout"),
+    ("checkout-redesign", "align with design on address form"),
+    ("stock-depletion", "review !482 depletion consumer"),
+    ("stock-depletion", "write ADR for depletion events"),
+    ("renovate-config", "decide renovate schedule"),
+    ("renovate-config", "open MR for renovate.json"),
+]
 
 # (epic slugs, days ago, source, author, title, event, summary, todos)
 ITEMS = [
@@ -72,11 +99,16 @@ def seed_demo(vault: Path | None = None, today: date | None = None) -> Path:
         item = RawItem(source=source, id=f"{source}-demo-{n}", url=f"https://{source}.example/{n}",
                        author=author, timestamp=iso(stamp), title=title, content=summary)
         save_raw(vault, item)
-        idx = ItemIndex(epics=epics, event=event, summary=summary, people=[author], todos=todos)
+        idx = ItemIndex(epics=epics, event=event, summary=summary, people=[author])
         for slug in idx.epics:
             update_epic(vault, item, idx, slug)
         update_daily(vault, item, idx)
 
+    from .dashboard import add_task, set_favorite, update_task
+
+    for slug, task in TASKS:
+        add_task(vault, slug, task)
+    set_favorite(vault, "stock-depletion", True)
     for slug, text in STATES.items():
         path = vault / "epics" / f"{slug}.md"
         _meta, title, _, todos, log = parse_epic(path.read_text())
@@ -87,8 +119,6 @@ def seed_demo(vault: Path | None = None, today: date | None = None) -> Path:
 
     lines = [f"- [{'x' if t == MY_TASKS[-1] else ' '}] {t}" for t in MY_TASKS]
     (vault / "tasks.md").write_text("# My tasks\n\n" + "\n".join(lines) + "\n")
-
-    from .dashboard import update_task
 
     for slug, task, offset, description in PLANNED:
         due = (today + timedelta(days=offset)).isoformat() if offset is not None else ""

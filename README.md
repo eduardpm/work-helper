@@ -54,6 +54,11 @@ next to each one re-collects that source, and **Sync all** collects everything
 and runs the indexer, like `work-helper sync`. To run it as a Dock app: open the URL in
 Safari and choose File > Add to Dock.
 
+Star an epic to mark it as a favorite (stored in the note's frontmatter); the
+Favorites button in the top bar hides everything else in every view. The indexer
+never creates tasks; you add them in the dashboard or in Obsidian. After changing
+the State format, `uv run work-helper index --restate` rewrites every epic's State.
+
 Three more views: **Changes** lists every log entry by day and marks the days
 since you last opened the app as new. **Blockers** collects the entries the
 indexer tagged as blocker or question, grouped by epic. **Ask** is the Codex chat
