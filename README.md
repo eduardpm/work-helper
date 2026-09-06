@@ -23,8 +23,10 @@ export JIRA_TOKEN=...            # Atlassian API token
 export GITLAB_TOKEN=glpat-...    # GitLab personal access token
 ```
 
-Start LM Studio, load a model (14B-class instruction model recommended), and
-enable the local server. Put the model name in `config.yaml`.
+Start LM Studio, load a model (30B-class recommended: Gemma 4 31B, or Qwen3.6
+35B-A3B when speed matters more than epic matching), set its
+context length to at least 16k tokens (the State rewrite sends the whole log),
+and enable the local server. Put the model name in `config.yaml`.
 
 ## Use
 

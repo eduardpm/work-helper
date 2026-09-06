@@ -5,11 +5,13 @@ import re
 
 from ..config import LMStudioConfig
 
+THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
+
 
 def extract_json(text: str) -> dict:
     """Pull a JSON object out of a model response that may contain
     <think> blocks, code fences, or prose around the JSON."""
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = THINK.sub("", text)
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end < start:
@@ -33,7 +35,7 @@ class LLM:
                 {"role": "user", "content": user},
             ],
         )
-        return resp.choices[0].message.content or ""
+        return THINK.sub("", resp.choices[0].message.content or "")
 
     def json_chat(self, system: str, user: str) -> dict:
         return extract_json(self.chat(system, user))

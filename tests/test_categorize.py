@@ -1,7 +1,7 @@
 import pytest
 
 from work_helper.collectors.base import RawItem
-from work_helper.indexer.categorize import categorize, normalize_slug
+from work_helper.indexer.categorize import categorize, normalize_slug, summarize_state
 from work_helper.indexer.llm import extract_json
 
 
@@ -66,3 +66,22 @@ def test_categorize_bad_epics_fall_back():
     idx = categorize(llm, item, [])
     assert idx.epics == ["misc"]
     assert idx.event == ""
+
+
+def test_categorize_keeps_titles_from_epic_objects():
+    llm = FakeLLM({"epics": [{"slug": "Stock Depletion", "title": "Stock depletion events"}, "misc"], "summary": "x"})
+    item = RawItem(
+        source="jira", id="x", url="", author="a",
+        timestamp="2026-08-31T10:00:00Z", title="t", content="c",
+    )
+    idx = categorize(llm, item, [])
+    assert idx.epics == ["stock-depletion", "misc"]
+    assert idx.titles == {"stock-depletion": "Stock depletion events"}
+
+
+def test_summarize_state_strips_links():
+    class ChatLLM:
+        def chat(self, system, user):
+            return "### Summary\nSee [slack link](https://x/y) and PROJ-1.\n"
+
+    assert summarize_state(ChatLLM(), "T", "", "") == "### Summary\nSee slack link and PROJ-1."

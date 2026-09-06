@@ -150,6 +150,7 @@
   .detail-body { padding: 4px 20px 20px; font-size: 14px; }
   .detail-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
   .detail-body .state p { max-width: 72ch; font-size: 15px; }
+  .detail-body .log-wrap > summary { cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
   .detail-body .log h4 { font-size: 13px; font-weight: 600; margin: 14px 0 2px; }
   .detail-body .log p { color: var(--fg); max-width: 80ch; margin: 0 0 4px; }
   .detail-body a { color: var(--primary); }
@@ -443,7 +444,8 @@ function renderDetail() {
     <div class="detail-head"><h2>${esc(e.title)}</h2><span class="badge ${e.status}">${e.status}</span>${starBtn(e)}<span class="path">epics/${esc(e.slug)}.md · ${e.entries} entries · last activity ${e.last || "—"}</span></div>
     <div class="detail-body">
       <h3>State</h3><div class="state">${e.state ? md(e.state) : "<p><em>No state summary yet. It is written after the next index run.</em></p>"}</div>
-      <h3>Timeline</h3><div class="log">${e.log ? md(e.log) : "<p><em>No log entries.</em></p>"}</div>
+      <details class="log-wrap"><summary>Timeline · ${e.entries} entries with source links</summary>
+      <div class="log">${e.log ? md(e.log) : "<p><em>No log entries.</em></p>"}</div></details>
     </div>`;
 }
 document.addEventListener("toggle", (ev) => {

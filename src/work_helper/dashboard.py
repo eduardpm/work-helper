@@ -19,7 +19,7 @@ from pathlib import Path
 from .answer.answer import ANSWER_PROMPT
 from .collectors import SOURCES, collect_sources
 from .config import CodexConfig, Config
-from .indexer.categorize import normalize_slug
+from .indexer.categorize import STATE_FORMAT, normalize_slug
 from .indexer.render import DUE_MARK, epic_path, parse_epic, render_epic
 from .state import State
 
@@ -49,12 +49,10 @@ of Markdown notes, which is the current working directory.
 - daily/<date>.md: what happened that day.
 """
 
-EDIT_RULES = """When the user asks to REFINE a note (rewrite the State, add, remove or reword
+EDIT_RULES = f"""When the user asks to REFINE a note (rewrite the State, add, remove or reword
 TODOs, fix tags, people, refs or the title), edit it in place and keep the
-structure above. The State has exactly three "###" sections: "Summary" (2-4
-sentences), "Where it stands" (bullets, newest first, with names and ticket or MR
-keys) and "Blockers and questions" (bullets with who waits on whom, or "- none
-known"). Prefer newer log entries when they conflict. Never tick or untick TODO
+structure above. {STATE_FORMAT}
+Prefer newer log entries when they conflict. Never tick or untick TODO
 boxes or change their dates; only add or reword TODOs when the user asks. Do not
 edit files the user did not ask about. Then reply with a short summary of what
 you changed.

@@ -88,7 +88,7 @@ def update_epic(vault: Path, item: RawItem, idx: ItemIndex, slug: str) -> Path:
         meta, title, state, todos, log_body = parse_epic(path.read_text())
         todos = [t for t in todos if "(nothing tracked yet)" not in t]
     else:
-        meta, title, state, todos, log_body = {}, title_for(slug), "", [], ""
+        meta, title, state, todos, log_body = {}, idx.titles.get(slug) or title_for(slug), "", [], ""
 
     meta["tags"] = _merge_list(meta.get("tags"), idx.tags)
     meta["people"] = _merge_list(meta.get("people"), idx.people)

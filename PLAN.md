@@ -46,8 +46,8 @@ vault/
 ```
 
 Epic notes carry YAML frontmatter (`tags`, `people`, `refs`, `updated`) and a
-fixed body: `# Title`, `## State` (LLM-maintained catch-up summary with three
-`###` sections: Summary, Where it stands, Blockers and questions), `## TODO`
+fixed body: `# Title`, `## State` (LLM-maintained, as long as the log supports:
+Summary, Where it stands, Decisions, Blockers and questions), `## TODO`
 (the user's checkboxes with `📅` due dates and indented descriptions; the indexer
 only preserves them, it never adds tasks), `## Log` (newest first, one entry per
 item, tagged with an event kind: decision, blocker, discovery, question,
@@ -87,7 +87,8 @@ that note's `## State` section from the old state plus the log — this is the
 Known risk: merging is harder than labeling. A small model will sometimes put a
 Slack thread and its Jira ticket in different epics. Mitigations: pass the
 existing epic list in the prompt, prefer Jira keys and MR numbers as anchors,
-and use a 14B-class instruction model (Qwen3 14B or similar).
+and use a 30B-class model (Gemma 4 31B dense on a 48 GB Mac; Qwen3.6 35B-A3B
+is faster but weaker at matching an item against the epic list).
 
 ## Answerer
 

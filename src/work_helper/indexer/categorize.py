@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from ..collectors.base import RawItem
 from .llm import LLM
@@ -17,43 +17,61 @@ more than one epic.
 
 Respond with ONE JSON object and nothing else:
 {{
-  "epics": ["kebab-case-slug"],
+  "epics": [{{"slug": "kebab-case-slug", "title": "Short human title of the epic"}}],
   "event": "",
   "tags": ["lowercase", "keywords"],
   "people": ["names mentioned or involved"],
-  "summary": "1-3 short sentences: what happened in this item, with names",
+  "summary": "everything this item tells us: every fact, decision, number, date, name, reason and open question, in as many sentences as needed",
   "refs": ["ticket keys like PROJ-123 or MR numbers like !45 mentioned in the item"]
 }}
 
 Rules:
-- epics: 1 to 3 slugs. Reuse an EXISTING EPICS slug whenever the item belongs
-  there. Only invent a new slug when nothing existing fits.
+- epics: 1 to 3. Reuse an EXISTING EPICS slug whenever the item belongs there
+  (title may be "" then). Only invent a new epic when nothing existing fits.
+- A slug or title names the TOPIC of the work, never a ticket key or MR number:
+  PROJ-123 is a ref, "checkout-redesign" is an epic.
 - Ticket keys and MR numbers are the strongest signal that items share an epic.
 - event: what kind of development this item is, one of {kinds} —
   or "" if none clearly fits.
+- summary: complete rather than short. The item text is not read again later;
+  this summary is all the knowledge base keeps of it.
 - Keep tags generic and reusable (e.g. "renovate", "ci", "deployment").
 """.format(kinds=", ".join(f'"{k}"' for k in EVENT_KINDS))
 
-STATE_PROMPT = """You maintain the "State" section of an epic note in a personal
-work knowledge base. The reader wants to catch up on this epic without reading
-every message, ticket, and PR behind it.
-
-Write Markdown with exactly these three headings, in this order:
+# Shared with the Codex chat rules in dashboard.py, so both writers agree.
+STATE_FORMAT = """The State is a Markdown document with exactly these "###" headings, in this order:
 
 ### Summary
-2-4 sentences: what this epic is about, in plain words, and why it matters.
+What this epic is about and why it matters. Explain the concepts, terms and
+mechanics involved so a reader new to the topic understands it fully. Use
+paragraphs and bullets; put key terms in **bold**.
 
 ### Where it stands
-Bullet list, newest developments first: what was decided, built, merged or
-agreed, with names and ticket or MR keys when the log has them.
+Bullets, newest first, each starting with its date: what was decided, built,
+merged or agreed, with names and ticket or MR keys.
+
+### Decisions
+Bullets: each decision, who made it, and the reasoning behind it.
 
 ### Blockers and questions
-Bullet list of open blockers, disagreements or unanswered questions, each with
-who is waiting on whom. Write "- none known" if there are none.
+Bullets: open blockers, disagreements and unanswered questions, each with who is
+waiting on whom. Write "- none known" if there are none.
 
-Rules: use "###" headings only, one blank line between blocks, short bullets,
-prefer newer log entries when they conflict, do not repeat the log entry by
-entry, do not invent anything. Respond with the State text only."""
+Be thorough: length is not a concern, completeness is. Keep every fact, number,
+name, date, definition and rationale the log contains; never fold two distinct
+facts into one sentence. No URLs or Markdown links: cite items by ticket key, MR
+number or date. One blank line between blocks."""
+
+STATE_PROMPT = f"""You maintain the "State" section of an epic note in a personal
+work knowledge base. The reader wants to learn everything about this epic
+without reading the messages, tickets and PRs behind it.
+
+{STATE_FORMAT}
+
+Prefer newer log entries when they conflict. Do not invent anything. Respond
+with the State text only."""
+
+LINK = re.compile(r"\[([^\]]+)\]\(https?://[^)\s]+\)")
 
 
 class ItemIndex(BaseModel):
@@ -61,12 +79,33 @@ class ItemIndex(BaseModel):
     LLM, so every field is cleaned rather than trusted."""
 
     epics: list[str] = ["misc"]
+    titles: dict[str, str] = {}  # slug -> title, for epics the model proposed
     event: str = ""
     summary: str = ""
     tags: list[str] = []
     people: list[str] = []
     todos: list[str] = []
     refs: list[str] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def _split_epics(cls, data):
+        """epics may arrive as slugs or as {"slug", "title"} objects."""
+        if not isinstance(data, dict):
+            return data
+        raw = data.get("epics") or []
+        if isinstance(raw, (str, dict)):
+            raw = [raw]
+        titles, slugs = dict(data.get("titles") or {}), []
+        for e in raw:
+            if isinstance(e, dict):
+                slug = normalize_slug(str(e.get("slug") or ""))
+                if str(e.get("title") or "").strip():
+                    titles[slug] = str(e["title"]).strip()
+                slugs.append(slug)
+            else:
+                slugs.append(str(e))
+        return {**data, "epics": slugs, "titles": titles}
 
     @field_validator("epics", mode="before")
     @classmethod
@@ -129,6 +168,6 @@ def categorize(llm: LLM, item: RawItem, existing_epics: list[str]) -> ItemIndex:
 
 def summarize_state(llm: LLM, title: str, state: str, log_body: str) -> str:
     user = "EPIC: {}\n\nCURRENT STATE:\n{}\n\nLOG (newest first):\n{}".format(
-        title, state or "(empty)", log_body[:8000]
+        title, state or "(empty)", log_body[:40000]  # needs a 16k+ context in LM Studio
     )
-    return llm.chat(STATE_PROMPT, user).strip()
+    return LINK.sub(r"\1", llm.chat(STATE_PROMPT, user)).strip()

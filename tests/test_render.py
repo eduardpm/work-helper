@@ -89,3 +89,10 @@ def test_daily_note_links_all_epics(tmp_path):
     assert text.startswith("# 2026-08-31")
     assert "[[renovate-config]]" in text
     assert "[[ci]]" in text
+
+
+def test_new_epic_uses_model_title(tmp_path):
+    idx = make_index([], epics=("proj-123-cleanup",))
+    idx.titles["proj-123-cleanup"] = "Renovate config cleanup"
+    text = update_epic(tmp_path, make_item(), idx, "proj-123-cleanup").read_text()
+    assert "# Renovate config cleanup" in text
